@@ -6,5 +6,7 @@ passlib[bcrypt]
 sqlalchemy
 psycopg2
 alembic
-pydantic
+email-validator
+pydantic[email]
+python-multipart
 boto3

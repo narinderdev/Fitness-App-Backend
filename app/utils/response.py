@@ -1,4 +1,5 @@
 from fastapi import HTTPException, status
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
 
@@ -10,11 +11,12 @@ def create_response(
 ) -> JSONResponse:
     """Return a consistent API response payload and status code."""
     payload_status = status_text or ("success" if status_code < 400 else "error")
+    encoded_data = jsonable_encoder(data)
     return JSONResponse(
         status_code=status_code,
         content={
             "message": message,
-            "data": data,
+            "data": encoded_data,
             "status": payload_status,
             "status_code": status_code,
         },

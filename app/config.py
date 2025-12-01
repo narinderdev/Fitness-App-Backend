@@ -15,5 +15,10 @@ class Settings:
 
     # Bearer token extractor for Swagger & middleware
     bearer_scheme = HTTPBearer()
+    cors_origins = [
+        origin.strip()
+        for origin in os.getenv("CORS_ORIGINS", "*").split(",")
+        if origin.strip()
+    ]
 
 settings = Settings()

@@ -1,4 +1,5 @@
 from enum import Enum
+from datetime import datetime
 from pydantic import BaseModel
 
 
@@ -23,6 +24,6 @@ class VideoResponse(BaseModel):
     gender: str
     video_url: str
     thumbnail_url: str
-    created_at: str
+    created_at: datetime
 
     model_config = {"from_attributes": True}

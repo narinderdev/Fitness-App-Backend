@@ -1,14 +1,26 @@
 from fastapi import FastAPI, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+
+from app.config import settings
 from app.database import Base, engine
-from app.routers import auth, profile, videos, users
-from seed import run_seed
+from app.routers import auth, profile, questions, videos, users
 from app.utils.response import create_response, handle_exception
+from seed import run_seed
 
 app = FastAPI()
 
 # Auto create tables
 Base.metadata.create_all(bind=engine)
+
+# CORS for SPA / API access
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Seed default user on startup
 @app.on_event("startup")
@@ -18,6 +30,7 @@ def startup_event():
 # Add routes
 app.include_router(auth.router)
 app.include_router(profile.router)
+app.include_router(questions.router)
 app.include_router(videos.router)
 app.include_router(users.router)
 

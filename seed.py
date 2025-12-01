@@ -12,7 +12,7 @@ def run_seed():
             admin_user = User(
                 first_name="Admin",
                 last_name="User",
-                email="admin@fitness.com",
+                email="mdkaifeeeminence@gmail.com",
                 otp=None,
                 phone=None,
                 dob=None,

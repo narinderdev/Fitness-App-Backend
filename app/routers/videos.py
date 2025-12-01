@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.video import Video
 from app.schemas.video import VideoResponse, BodyPartEnum, GenderEnum
+from app.services.auth_middleware import get_current_user
 from app.services.spaces_service import (
     get_videos_by_category,
     normalize_category,
@@ -22,7 +23,11 @@ from app.services.spaces_service import (
 )
 from app.utils.response import create_response, handle_exception
 
-router = APIRouter(prefix="/videos", tags=["Videos"])
+router = APIRouter(
+    prefix="/videos",
+    tags=["Videos"],
+    dependencies=[Depends(get_current_user)],
+)
 
 ALLOWED_VIDEO_TYPES = {"video/mp4", "video/mpeg", "video/quicktime"}
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/jpg"}

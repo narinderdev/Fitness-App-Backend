@@ -1,7 +1,7 @@
 from fastapi import FastAPI, status
 from fastapi.staticfiles import StaticFiles
 from app.database import Base, engine
-from app.routers import auth, profile
+from app.routers import auth, profile, videos
 from seed import run_seed
 from app.utils.response import create_response, handle_exception
 
@@ -18,6 +18,7 @@ def startup_event():
 # Add routes
 app.include_router(auth.router)
 app.include_router(profile.router)
+app.include_router(videos.router)
 
 # Serve uploaded assets
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")

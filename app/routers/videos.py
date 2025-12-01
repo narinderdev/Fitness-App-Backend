@@ -147,3 +147,76 @@ async def upload_video(
         )
     except Exception as exc:
         return handle_exception(exc)
+
+
+@router.put("/{video_id}")
+async def update_video(
+    video_id: int,
+    body_part: BodyPartEnum | None = Form(None),
+    gender: GenderEnum | None = Form(None),
+    title: str | None = Form(None),
+    description: str | None = Form(None),
+    video_file: UploadFile | None = File(None),
+    thumbnail_file: UploadFile | None = File(None),
+    db: Session = Depends(get_db),
+):
+    try:
+        video = db.query(Video).filter(Video.id == video_id).first()
+        if not video:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
+
+        if body_part:
+            video.body_part = body_part.value
+        if gender:
+            video.gender = gender.value
+        if title is not None:
+            video.title = title
+        if description is not None:
+            video.description = description
+
+        if video_file:
+            if (video_file.content_type or "").lower() not in ALLOWED_VIDEO_TYPES:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported video format")
+            new_video_filename = _safe_filename(video.body_part, video_file.filename or "video.mp4", ".mp4")
+            video_bytes = await video_file.read()
+            video.video_url = upload_category_video(video_bytes, new_video_filename, video.body_part, video_file.content_type)
+
+        if thumbnail_file:
+            if (thumbnail_file.content_type or "").lower() not in ALLOWED_IMAGE_TYPES:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported thumbnail format")
+            new_thumb_filename = _safe_filename(video.body_part, thumbnail_file.filename or "thumbnail.jpg", ".jpg")
+            thumbnail_bytes = await thumbnail_file.read()
+            video.thumbnail_url = upload_category_thumbnail(
+                thumbnail_bytes, new_thumb_filename, video.body_part, thumbnail_file.content_type
+            )
+
+        db.commit()
+        db.refresh(video)
+
+        payload = VideoResponse.model_validate(video).model_dump()
+        return create_response(
+            message="Video updated successfully",
+            data=payload,
+            status_code=status.HTTP_200_OK,
+        )
+    except Exception as exc:
+        return handle_exception(exc)
+
+
+@router.delete("/{video_id}")
+def delete_video(video_id: int, db: Session = Depends(get_db)):
+    try:
+        video = db.query(Video).filter(Video.id == video_id).first()
+        if not video:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
+
+        db.delete(video)
+        db.commit()
+
+        return create_response(
+            message="Video deleted successfully",
+            data={"deleted": True, "video_id": video_id},
+            status_code=status.HTTP_200_OK,
+        )
+    except Exception as exc:
+        return handle_exception(exc)

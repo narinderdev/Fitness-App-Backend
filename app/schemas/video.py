@@ -23,5 +23,6 @@ class VideoResponse(BaseModel):
     gender: str
     video_url: str
     thumbnail_url: str
+    created_at: str
 
     model_config = {"from_attributes": True}

@@ -50,6 +50,30 @@ def request_otp(body: RequestOtp, db: Session = Depends(get_db)):
         return handle_exception(exc)
 
 
+@router.post("/otp/resend")
+def resend_otp(body: RequestOtp, db: Session = Depends(get_db)):
+    try:
+        user = db.query(User).filter(User.email == body.email).first()
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+        otp = str(random.randint(100000, 999999))
+        user.otp = otp
+        if not user.is_active:
+            user.is_active = True
+        db.commit()
+
+        send_email_otp(body.email, otp)
+        flow = "register" if not user.first_name else "login"
+        return create_response(
+            message="OTP resent successfully",
+            data={"email": body.email, "flow": flow},
+            status_code=status.HTTP_200_OK
+        )
+    except Exception as exc:
+        return handle_exception(exc)
+
+
 @router.post("/otp/verify")
 def verify_otp(body: VerifyOtp, db: Session = Depends(get_db)):
     try:

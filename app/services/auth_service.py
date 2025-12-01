@@ -3,6 +3,7 @@ from jose import jwt
 from passlib.context import CryptContext
 from dotenv import load_dotenv
 import os
+import uuid
 
 load_dotenv()
 
@@ -20,6 +21,8 @@ def verify_password(plain_password: str, hashed_password: str):
 
 def create_access_token(data: dict):
     to_encode = data.copy()
+    if "jti" not in to_encode:
+        to_encode["jti"] = str(uuid.uuid4())
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)

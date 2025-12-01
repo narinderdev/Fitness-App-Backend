@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, Boolean
 from app.database import Base
 
 class User(Base):
@@ -7,7 +7,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     # Registration fields
-    first_name = Column(String, nullable=False)
+    first_name = Column(String, nullable=True)
     last_name = Column(String, nullable=True)
     email = Column(String, unique=True, index=True, nullable=False)
     
@@ -19,3 +19,6 @@ class User(Base):
     dob = Column(String, nullable=True)       # store YYYY-MM-DD
     gender = Column(String, nullable=True)    
     photo = Column(String, nullable=True)     # image URL or base64
+
+    # Soft delete flag
+    is_active = Column(Boolean, default=True, nullable=False)

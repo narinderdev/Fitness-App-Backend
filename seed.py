@@ -17,7 +17,8 @@ def run_seed():
                 phone=None,
                 dob=None,
                 gender=None,
-                photo=None
+                photo=None,
+                is_active=True
             )
 
             db.add(admin_user)

@@ -7,6 +7,7 @@ class GenderEnum(str, Enum):
     male = "Male"
     female = "Female"
     both = "Both"
+    all = "All"
 
 
 class BodyPartEnum(str, Enum):

@@ -25,11 +25,12 @@ def request_otp(body: RequestOtp, db: Session = Depends(get_db)):
         flow = "login"
 
         if user:
+            was_verified = user.otp is None
             user.otp = otp
             if not user.is_active:
                 user.is_active = True
                 flow = "reactivated"
-            elif not user.first_name:
+            elif not was_verified:
                 flow = "register"
             db.commit()
             db.refresh(user)
@@ -58,13 +59,14 @@ def resend_otp(body: RequestOtp, db: Session = Depends(get_db)):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
         otp = str(random.randint(100000, 999999))
+        was_verified = user.otp is None
         user.otp = otp
         if not user.is_active:
             user.is_active = True
         db.commit()
 
         send_email_otp(body.email, otp)
-        flow = "register" if not user.first_name else "login"
+        flow = "login" if was_verified else "register"
         return create_response(
             message="OTP resent successfully",
             data={"email": body.email, "flow": flow},

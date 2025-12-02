@@ -4,9 +4,14 @@ python-dotenv
 python-jose[cryptography]
 passlib[bcrypt]
 sqlalchemy
-psycopg2
+psycopg2-binary
 alembic
 email-validator
 pydantic[email]
 python-multipart
 boto3
+google-api-python-client
+google-auth
+google-auth-httplib2
+google-auth-oauthlib
+itsdangerous

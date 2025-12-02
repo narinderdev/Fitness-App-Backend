@@ -1,14 +1,17 @@
 from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.database import Base, engine
-from app.routers import auth, profile, questions, videos, users
+from app.routers import auth, profile, questions, videos, users,google_auth
 from app.utils.response import create_response, handle_exception
 from seed import run_seed
 
 app = FastAPI()
+app.add_middleware(SessionMiddleware, secret_key=settings.JWT_SECRET)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Auto create tables
 Base.metadata.create_all(bind=engine)
@@ -29,6 +32,7 @@ def startup_event():
 
 # Add routes
 app.include_router(auth.router)
+app.include_router(google_auth.router)
 app.include_router(profile.router)
 app.include_router(questions.router)
 app.include_router(videos.router)

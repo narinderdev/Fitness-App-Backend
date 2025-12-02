@@ -9,7 +9,7 @@ from app.database import get_db
 from app.models.user import User
 from app.models.user_session import UserSession
 from app.schemas.user import RequestOtp, VerifyOtp
-from app.services.email_services import send_email_otp
+from app.services.gmail_oauth_service import send_email_otp
 from app.services.auth_service import create_access_token
 from app.services.auth_middleware import get_current_session
 from app.utils.response import create_response, handle_exception

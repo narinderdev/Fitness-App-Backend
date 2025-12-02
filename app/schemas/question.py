@@ -1,57 +1,79 @@
 from datetime import datetime
 from enum import Enum
 
-from pydantic import BaseModel, ValidationInfo, field_validator
+from pydantic import BaseModel
 
 
-class QuestionTypeEnum(str, Enum):
+class AnswerTypeEnum(str, Enum):
+    single_choice = "single_choice"
+    multi_choice = "multi_choice"
+    text = "text"
+    number = "number"
+    date = "date"
     weight = "weight"
     height = "height"
-    habits = "habits"
-    nutrition = "nutrition"
     other = "other"
 
 
-class QuestionBase(BaseModel):
-    prompt: str
-    answer: str
-    gender: str | None = None
-    question_type: QuestionTypeEnum
-    measurement_units: list[str] | None = None
-
-    @field_validator("measurement_units")
-    @classmethod
-    def validate_measurement_units(cls, value, info: ValidationInfo):
-        if value is not None:
-            cleaned = [unit.strip() for unit in value if isinstance(unit, str) and unit.strip()]
-            value = cleaned or None
-
-        question_type = info.data.get("question_type")
-        if question_type in {QuestionTypeEnum.weight, QuestionTypeEnum.height} and not value:
-            raise ValueError("measurement_units is required for weight or height questions")
-        return value
+class AnswerOptionBase(BaseModel):
+    option_text: str
+    value: str | None = None
+    is_active: bool = True
 
 
-class QuestionCreate(QuestionBase):
+class AnswerOptionCreate(AnswerOptionBase):
     pass
 
 
-class QuestionUpdate(BaseModel):
-    prompt: str | None = None
-    answer: str | None = None
+class AnswerOptionUpdate(BaseModel):
+    id: int | None = None
+    option_text: str
+    value: str | None = None
+    is_active: bool | None = None
+
+
+class AnswerOptionResponse(AnswerOptionBase):
+    id: int
+    question_id: int
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class QuestionBase(BaseModel):
+    question: str
+    description: str | None = None
+    answer_type: AnswerTypeEnum
     gender: str | None = None
-    question_type: QuestionTypeEnum | None = None
-    measurement_units: list[str] | None = None
+    is_required: bool = False
+    is_active: bool = True
+
+
+class QuestionCreate(QuestionBase):
+    options: list[AnswerOptionCreate] | None = None
+
+
+class QuestionUpdate(BaseModel):
+    question: str | None = None
+    description: str | None = None
+    answer_type: AnswerTypeEnum | None = None
+    gender: str | None = None
+    is_required: bool | None = None
+    is_active: bool | None = None
+    options: list[AnswerOptionUpdate] | None = None
 
 
 class QuestionResponse(BaseModel):
     id: int
-    prompt: str
-    answer: str
+    question: str
+    description: str | None
+    answer_type: AnswerTypeEnum
     gender: str | None
-    question_type: QuestionTypeEnum
-    measurement_units: list[str] | None
+    is_required: bool
+    is_active: bool
     created_at: datetime
     updated_at: datetime
+    options: list[AnswerOptionResponse]
 
     model_config = {"from_attributes": True}

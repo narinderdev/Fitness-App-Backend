@@ -20,34 +20,52 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 @router.post("/otp/request")
 def request_otp(body: RequestOtp, db: Session = Depends(get_db)):
     try:
+        print("📩 OTP Request Received for:", body.email)
+
         user = db.query(User).filter(User.email == body.email).first()
         otp = str(random.randint(100000, 999999))
+        print("🔢 Generated OTP:", otp)
+
         flow = "login"
 
         if user:
+            print("👤 Existing user found:", user.email)
             was_verified = user.otp is None
             user.otp = otp
+
             if not user.is_active:
+                print("⚠️ User not active — reactivating")
                 user.is_active = True
                 flow = "reactivated"
+
             elif not was_verified:
+                print("🆕 User not verified yet — registration flow")
                 flow = "register"
+
             db.commit()
             db.refresh(user)
+
         else:
+            print("🆕 Creating new user:", body.email)
             user = User(email=body.email, otp=otp)
             db.add(user)
             db.commit()
             db.refresh(user)
             flow = "register"
 
+        print("📨 Sending OTP Email...")
         send_email_otp(body.email, otp)
+
+        print("✅ OTP email sent successfully!")
+
         return create_response(
             message="OTP sent successfully",
             data={"email": body.email, "flow": flow},
             status_code=status.HTTP_200_OK
         )
+
     except Exception as exc:
+        print("❌ ERROR in request_otp:", exc)
         return handle_exception(exc)
 
 

@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.database import Base, engine
-from app.routers import auth, profile, questions, videos, users,google_auth
+from app.routers import auth, profile, questions, videos, users,google_auth, answers
 from app.utils.response import create_response, handle_exception
 from seed import run_seed
 
@@ -35,6 +35,7 @@ app.include_router(auth.router)
 app.include_router(google_auth.router)
 app.include_router(profile.router)
 app.include_router(questions.router)
+app.include_router(answers.router)
 app.include_router(videos.router)
 app.include_router(users.router)
 

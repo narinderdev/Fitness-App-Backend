@@ -31,9 +31,13 @@ def request_otp(body: RequestOtp, db: Session = Depends(get_db)):
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
             if platform != PlatformEnum.web.value:
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admins can only login via web")
+            if not user.is_active:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You have been deactivated by admin")
         else:
             if user and user.is_admin and platform != PlatformEnum.web.value:
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admins can only login via web")
+            if user and not user.is_active:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You have been deactivated by admin")
 
         if platform == PlatformEnum.web.value and not is_admin_request:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Web OTPs reserved for admins")
@@ -100,11 +104,15 @@ def resend_otp(body: RequestOtp, db: Session = Depends(get_db)):
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
             if platform != PlatformEnum.web.value:
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admins can only login via web")
+            if not user.is_active:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You have been deactivated by admin")
         else:
             if user.is_admin and platform != PlatformEnum.web.value:
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admins can only login via web")
             if platform == PlatformEnum.web.value:
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Web OTPs reserved for admins")
+            if not user.is_active:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You have been deactivated by admin")
 
         otp = str(random.randint(100000, 999999))
         was_verified = user.otp is None

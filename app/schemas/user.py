@@ -40,5 +40,6 @@ class ProfileResponse(BaseModel):
     gender: str | None
     photo: str | None
     is_active: bool
+    is_admin: bool
 
     model_config = {"from_attributes": True}

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status, Query
+from fastapi import APIRouter, Depends, status, Query, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -20,7 +20,7 @@ def list_users(
     current_admin=Depends(get_current_admin)
 ):
     try:
-        base_query = db.query(User).order_by(User.id.asc())
+        base_query = db.query(User).filter(User.is_admin == False).order_by(User.id.asc())
         total = base_query.count()
         users = base_query.offset((page - 1) * page_size).limit(page_size).all()
         payload = [
@@ -37,6 +37,36 @@ def list_users(
                 "has_next": page * page_size < total,
                 "users": payload
             },
+            status_code=status.HTTP_200_OK,
+        )
+    except Exception as exc:
+        return handle_exception(exc)
+
+
+@router.put("/{user_id}/status")
+def update_user_status(
+    user_id: int,
+    is_active: bool,
+    db: Session = Depends(get_db),
+    current_admin=Depends(get_current_admin)
+):
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+        if user.is_admin and not is_active:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot deactivate another admin")
+
+        user.is_active = is_active
+        db.commit()
+        db.refresh(user)
+
+        payload = ProfileResponse.model_validate(user).model_dump()
+        message = "User activated successfully" if is_active else "User deactivated successfully"
+        return create_response(
+            message=message,
+            data=payload,
             status_code=status.HTTP_200_OK,
         )
     except Exception as exc:

@@ -32,6 +32,9 @@ class UserAnswerOptionResponse(BaseModel):
 class UserAnswerResponse(BaseModel):
     id: int
     question_id: int
+    question: str
+    question_description: str | None
+    answer_type: str
     answer_text: str | None
     created_at: datetime
     options: list[UserAnswerOptionResponse] | None

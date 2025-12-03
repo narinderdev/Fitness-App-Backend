@@ -26,6 +26,9 @@ def _answer_payload(answer: UserAnswer) -> dict:
     return UserAnswerResponse(
         id=answer.id,
         question_id=answer.question_id,
+        question=answer.question.question if answer.question else "",
+        question_description=answer.question.description if answer.question else None,
+        answer_type=answer.question.answer_type if answer.question else "",
         answer_text=answer.answer_text,
         created_at=answer.created_at,
         options=option_payloads,
@@ -43,13 +46,25 @@ def submit_answer(
         if not question:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
 
-        answer = UserAnswer(
-            user_id=current_user.id,
-            question_id=question.id,
-            answer_text=body.answer_text,
+        answer = (
+            db.query(UserAnswer)
+            .filter(
+                UserAnswer.user_id == current_user.id,
+                UserAnswer.question_id == question.id,
+            )
+            .first()
         )
-        db.add(answer)
-        db.flush()
+        if answer:
+            answer.answer_text = body.answer_text
+            db.query(UserAnswerOption).filter(UserAnswerOption.user_answer_id == answer.id).delete()
+        else:
+            answer = UserAnswer(
+                user_id=current_user.id,
+                question_id=question.id,
+                answer_text=body.answer_text,
+            )
+            db.add(answer)
+            db.flush()
 
         if body.options:
             option_ids = [opt.option_id for opt in body.options]

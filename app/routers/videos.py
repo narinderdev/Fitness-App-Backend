@@ -7,6 +7,7 @@ from fastapi import (
     UploadFile,
     File,
     Form,
+    Query,
     status,
 )
 from sqlalchemy.orm import Session
@@ -32,6 +33,8 @@ router = APIRouter(
 ALLOWED_VIDEO_TYPES = {"video/mp4", "video/mpeg", "video/quicktime"}
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/jpg"}
 BODY_PART_VALUES = {bp.value for bp in BodyPartEnum}
+DEFAULT_PAGE_SIZE = 20
+MAX_PAGE_SIZE = 100
 
 
 def _safe_filename(body_part: str, original_name: str, fallback_ext: str) -> str:
@@ -46,17 +49,37 @@ def _resolve_category(category: str) -> str | None:
     return normalized
 
 
+def _pagination_meta(page: int, page_size: int, total: int, count: int) -> dict:
+    return {
+        "page": page,
+        "page_size": page_size,
+        "count": count,
+        "total": total,
+        "has_next": page * page_size < total,
+    }
+
+
 @router.get("/db/{category}")
-def fetch_db_videos(category: str, db: Session = Depends(get_db)):
+def fetch_db_videos(
+    category: str,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+    db: Session = Depends(get_db),
+):
     try:
         normalized = _resolve_category(category)
         if not normalized:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid category")
 
-        stored_videos = (
+        base_query = (
             db.query(Video)
             .filter(Video.body_part == normalized)
             .order_by(Video.created_at.desc())
+        )
+        total = base_query.count()
+        stored_videos = (
+            base_query.offset((page - 1) * page_size)
+            .limit(page_size)
             .all()
         )
 
@@ -70,7 +93,7 @@ def fetch_db_videos(category: str, db: Session = Depends(get_db)):
             data={
                 "category": normalized,
                 "source": "database",
-                "count": len(payload),
+                **_pagination_meta(page, page_size, total, len(payload)),
                 "videos": payload,
             },
             status_code=status.HTTP_200_OK,
@@ -80,20 +103,28 @@ def fetch_db_videos(category: str, db: Session = Depends(get_db)):
 
 
 @router.get("/spaces/{category}")
-def fetch_spaces_videos(category: str):
+def fetch_spaces_videos(
+    category: str,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+):
     try:
         normalized = _resolve_category(category)
         if not normalized:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid category")
 
         remote_videos = get_videos_by_category(normalized)
+        total = len(remote_videos)
+        start = (page - 1) * page_size
+        end = start + page_size
+        paginated = remote_videos[start:end]
         return create_response(
             message="Videos fetched from DigitalOcean Spaces",
             data={
                 "category": normalized,
                 "source": "spaces",
-                "count": len(remote_videos),
-                "videos": remote_videos,
+                **_pagination_meta(page, page_size, total, len(paginated)),
+                "videos": paginated,
             },
             status_code=status.HTTP_200_OK,
         )

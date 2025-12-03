@@ -1,13 +1,25 @@
 from pydantic import BaseModel, EmailStr
 
+from enum import Enum
+
+from pydantic import BaseModel, EmailStr
+
+
+class PlatformEnum(str, Enum):
+    app = "app"
+    web = "web"
+
+
 class RequestOtp(BaseModel):
     email: EmailStr
     is_admin: bool = False
+    platform: PlatformEnum = PlatformEnum.app
 
 class VerifyOtp(BaseModel):
     email: EmailStr
     otp: str
     is_admin: bool = False
+    platform: PlatformEnum = PlatformEnum.app
 
 class ProfileUpdate(BaseModel):
     first_name: str | None = None

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
 from app.models.user_session import UserSession
-from app.schemas.user import RequestOtp, VerifyOtp
+from app.schemas.user import RequestOtp, VerifyOtp, PlatformEnum
 from app.services.gmail_oauth_service import send_email_otp
 from app.services.auth_service import create_access_token
 from app.services.auth_middleware import get_current_session
@@ -24,10 +24,19 @@ def request_otp(body: RequestOtp, db: Session = Depends(get_db)):
 
         user = db.query(User).filter(User.email == body.email).first()
         is_admin_request = body.is_admin
+        platform = body.platform.value if isinstance(body.platform, PlatformEnum) else body.platform
 
         if is_admin_request:
             if not user or not user.is_admin:
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+            if platform != PlatformEnum.web.value:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admins can only login via web")
+        else:
+            if user and user.is_admin and platform != PlatformEnum.web.value:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admins can only login via web")
+
+        if platform == PlatformEnum.web.value and not is_admin_request:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Web OTPs reserved for admins")
 
         otp = str(random.randint(100000, 999999))
         print("🔢 Generated OTP:", otp)
@@ -53,6 +62,8 @@ def request_otp(body: RequestOtp, db: Session = Depends(get_db)):
 
         else:
             print("🆕 Creating new user:", body.email)
+            if platform == PlatformEnum.web.value:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Web registrations are disabled")
             user = User(email=body.email, otp=otp)
             db.add(user)
             db.commit()
@@ -82,8 +93,18 @@ def resend_otp(body: RequestOtp, db: Session = Depends(get_db)):
         if not user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-        if body.is_admin and not user.is_admin:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+        platform = body.platform.value if isinstance(body.platform, PlatformEnum) else body.platform
+
+        if body.is_admin:
+            if not user.is_admin:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+            if platform != PlatformEnum.web.value:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admins can only login via web")
+        else:
+            if user.is_admin and platform != PlatformEnum.web.value:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admins can only login via web")
+            if platform == PlatformEnum.web.value:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Web OTPs reserved for admins")
 
         otp = str(random.randint(100000, 999999))
         was_verified = user.otp is None
@@ -110,8 +131,18 @@ def verify_otp(body: VerifyOtp, db: Session = Depends(get_db)):
         if not user or user.otp != body.otp:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OTP")
 
-        if body.is_admin and not user.is_admin:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+        platform = body.platform.value if isinstance(body.platform, PlatformEnum) else body.platform
+
+        if body.is_admin:
+            if not user.is_admin:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+            if platform != PlatformEnum.web.value:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admins can only login via web")
+        else:
+            if user.is_admin and platform != PlatformEnum.web.value:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admins can only login via web")
+            if platform == PlatformEnum.web.value:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Web OTPs reserved for admins")
 
         user.otp = None
         jti = str(uuid.uuid4())

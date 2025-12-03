@@ -24,10 +24,11 @@ from app.services.spaces_service import (
 )
 from app.utils.response import create_response, handle_exception
 
+from app.services.auth_middleware import get_current_user, get_current_admin
+
 router = APIRouter(
     prefix="/videos",
     tags=["Videos"],
-    dependencies=[Depends(get_current_user)],
 )
 
 ALLOWED_VIDEO_TYPES = {"video/mp4", "video/mpeg", "video/quicktime"}
@@ -65,6 +66,7 @@ def fetch_db_videos(
     page: int = Query(1, ge=1),
     page_size: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
     db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
 ):
     try:
         normalized = _resolve_category(category)
@@ -107,6 +109,7 @@ def fetch_spaces_videos(
     category: str,
     page: int = Query(1, ge=1),
     page_size: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+    current_user=Depends(get_current_user),
 ):
     try:
         normalized = _resolve_category(category)
@@ -141,6 +144,7 @@ async def upload_video(
     video_file: UploadFile = File(...),
     thumbnail_file: UploadFile = File(...),
     db: Session = Depends(get_db),
+    current_admin=Depends(get_current_admin),
 ):
     try:
         video_type = video_file.content_type or ""
@@ -195,6 +199,7 @@ async def update_video(
     video_file: UploadFile | None = File(None),
     thumbnail_file: UploadFile | None = File(None),
     db: Session = Depends(get_db),
+    current_admin=Depends(get_current_admin),
 ):
     try:
         video = db.query(Video).filter(Video.id == video_id).first()

@@ -23,6 +23,12 @@ def request_otp(body: RequestOtp, db: Session = Depends(get_db)):
         print("📩 OTP Request Received for:", body.email)
 
         user = db.query(User).filter(User.email == body.email).first()
+        is_admin_request = body.is_admin
+
+        if is_admin_request:
+            if not user or not user.is_admin:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+
         otp = str(random.randint(100000, 999999))
         print("🔢 Generated OTP:", otp)
 
@@ -76,6 +82,9 @@ def resend_otp(body: RequestOtp, db: Session = Depends(get_db)):
         if not user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
+        if body.is_admin and not user.is_admin:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+
         otp = str(random.randint(100000, 999999))
         was_verified = user.otp is None
         user.otp = otp
@@ -100,6 +109,9 @@ def verify_otp(body: VerifyOtp, db: Session = Depends(get_db)):
         user = db.query(User).filter(User.email == body.email, User.is_active == True).first()
         if not user or user.otp != body.otp:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OTP")
+
+        if body.is_admin and not user.is_admin:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
 
         user.otp = None
         jti = str(uuid.uuid4())

@@ -22,3 +22,6 @@ class User(Base):
 
     # Soft delete flag
     is_active = Column(Boolean, default=True, nullable=False)
+
+    # Admin flag
+    is_admin = Column(Boolean, default=False, nullable=False)

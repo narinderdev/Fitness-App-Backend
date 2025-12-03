@@ -2,10 +2,12 @@ from pydantic import BaseModel, EmailStr
 
 class RequestOtp(BaseModel):
     email: EmailStr
+    is_admin: bool = False
 
 class VerifyOtp(BaseModel):
     email: EmailStr
     otp: str
+    is_admin: bool = False
 
 class ProfileUpdate(BaseModel):
     first_name: str | None = None

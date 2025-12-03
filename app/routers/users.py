@@ -5,7 +5,7 @@ from app.database import get_db
 from app.models.user import User
 from app.schemas.user import ProfileResponse
 from app.utils.response import create_response, handle_exception
-from app.services.auth_middleware import get_current_user
+from app.services.auth_middleware import get_current_admin
 
 router = APIRouter(prefix="/users", tags=["Users"])
 DEFAULT_PAGE_SIZE = 20
@@ -17,7 +17,7 @@ def list_users(
     page: int = Query(1, ge=1),
     page_size: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_admin=Depends(get_current_admin)
 ):
     try:
         base_query = db.query(User).order_by(User.id.asc())

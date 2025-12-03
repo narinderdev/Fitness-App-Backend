@@ -10,15 +10,16 @@ def run_seed():
         # If database has no users create default admin
         if db.query(User).count() == 0:
             admin_user = User(
-                first_name="Admin",
-                last_name="User",
+                first_name="Md",
+                last_name="Kaifee",
                 email="mdkaifeeeminence@gmail.com",
                 otp=None,
                 phone=None,
                 dob=None,
-                gender=None,
+                gender=Male,
                 photo=None,
-                is_active=True
+                is_active=True,
+                is_admin=True,
             )
 
             db.add(admin_user)

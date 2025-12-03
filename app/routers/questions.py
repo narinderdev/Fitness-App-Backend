@@ -12,7 +12,7 @@ from app.schemas.question import (
     QuestionResponse,
     QuestionUpdate,
 )
-from app.services.auth_middleware import get_current_user
+from app.services.auth_middleware import get_current_user, get_current_admin
 from app.utils.response import create_response, handle_exception
 
 router = APIRouter(prefix="/questions", tags=["Questions"])
@@ -112,7 +112,7 @@ def _sync_options(
 def create_question(
     body: QuestionCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_admin=Depends(get_current_admin),
 ):
     try:
         gender_value = body.gender
@@ -205,7 +205,7 @@ def update_question(
     question_id: int,
     body: QuestionUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_admin=Depends(get_current_admin),
 ):
     try:
         question = db.query(Question).filter(Question.id == question_id).first()
@@ -242,7 +242,7 @@ def update_question(
 def delete_question(
     question_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_admin=Depends(get_current_admin),
 ):
     try:
         question = db.query(Question).filter(Question.id == question_id).first()

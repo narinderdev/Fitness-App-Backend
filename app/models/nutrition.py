@@ -1,0 +1,55 @@
+from datetime import datetime, date
+
+from sqlalchemy import (
+    Column,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+)
+from sqlalchemy.orm import relationship
+
+from app.database import Base
+
+
+class FoodItem(Base):
+    __tablename__ = "food_items"
+    __table_args__ = (UniqueConstraint("barcode", name="uq_food_barcode"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    barcode = Column(String, nullable=False, index=True)
+    product_name = Column(String, nullable=True)
+    brand = Column(String, nullable=True)
+    calories = Column(Float, nullable=True)
+    protein = Column(Float, nullable=True)
+    carbs = Column(Float, nullable=True)
+    fat = Column(Float, nullable=True)
+    serving_quantity = Column(Float, nullable=True)
+    serving_unit = Column(String, nullable=True)
+    image_url = Column(String, nullable=True)
+    source = Column(String, default="openfoodfacts", nullable=False)
+    last_synced_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    logs = relationship("FoodLog", back_populates="food_item")
+
+
+class FoodLog(Base):
+    __tablename__ = "food_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    food_item_id = Column(Integer, ForeignKey("food_items.id", ondelete="SET NULL"), nullable=True)
+    barcode = Column(String, nullable=True)
+    serving_multiplier = Column(Float, default=1.0, nullable=False)
+    calories = Column(Float, nullable=True)
+    protein = Column(Float, nullable=True)
+    carbs = Column(Float, nullable=True)
+    fat = Column(Float, nullable=True)
+    notes = Column(String, nullable=True)
+    consumed_date = Column(Date, default=date.today, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    food_item = relationship("FoodItem", back_populates="logs")

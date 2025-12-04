@@ -65,25 +65,25 @@ def upsert_steps(
         return handle_exception(exc)
 
 
-@router.get("/steps/today")
-def get_today_steps(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    try:
-        today = date.today()
-        step = (
-            db.query(HealthStep)
-            .filter(HealthStep.user_id == current_user.id, HealthStep.step_date == today)
-            .first()
-        )
-        return create_response(
-            message="Today's steps fetched successfully",
-            data=_step_payload(step),
-            status_code=status.HTTP_200_OK,
-        )
-    except Exception as exc:
-        return handle_exception(exc)
+# @router.get("/steps/today")
+# def get_today_steps(
+#     db: Session = Depends(get_db),
+#     current_user: User = Depends(get_current_user),
+# ):
+#     try:
+#         today = date.today()
+#         step = (
+#             db.query(HealthStep)
+#             .filter(HealthStep.user_id == current_user.id, HealthStep.step_date == today)
+#             .first()
+#         )
+#         return create_response(
+#             message="Today's steps fetched successfully",
+#             data=_step_payload(step),
+#             status_code=status.HTTP_200_OK,
+#         )
+#     except Exception as exc:
+#         return handle_exception(exc)
 
 
 @router.get("/steps/history")
@@ -102,13 +102,12 @@ def get_step_history(
                 HealthStep.step_date >= start_date,
                 HealthStep.step_date <= end_date,
             )
-            .order_by(HealthStep.step_date.asc())
             .all()
         )
         step_map = {step.step_date: step for step in steps}
         entries = []
-        iter_date = start_date
-        while iter_date <= end_date:
+        iter_date = end_date
+        while iter_date >= start_date:
             step = step_map.get(iter_date)
             payload = StepResponse(
                 date=iter_date.isoformat(),
@@ -116,7 +115,7 @@ def get_step_history(
                 source=step.source if step else None,
             ).model_dump()
             entries.append(payload)
-            iter_date += timedelta(days=1)
+            iter_date -= timedelta(days=1)
         return create_response(
             message="Step history fetched successfully",
             data={

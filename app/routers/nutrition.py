@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -146,3 +146,110 @@ def list_logs(
         )
     except Exception as exc:
         return handle_exception(exc)
+
+
+@router.get("/logs/summary")
+def calorie_summary(
+    days: int = Query(7, ge=1, le=31),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        end_date = date.today()
+        start_date = end_date - timedelta(days=days - 1)
+
+        logs = (
+            db.query(FoodLog)
+            .filter(
+                FoodLog.user_id == current_user.id,
+                FoodLog.consumed_date >= start_date,
+                FoodLog.consumed_date <= end_date,
+            )
+            .all()
+        )
+
+        totals = {}
+        entries_per_date = {}
+        for log in logs:
+            totals.setdefault(log.consumed_date, {"calories": 0.0, "protein": 0.0, "carbs": 0.0, "fat": 0.0})
+            totals[log.consumed_date]["calories"] += log.calories or 0.0
+            totals[log.consumed_date]["protein"] += log.protein or 0.0
+            totals[log.consumed_date]["carbs"] += log.carbs or 0.0
+            totals[log.consumed_date]["fat"] += log.fat or 0.0
+
+            entries_per_date.setdefault(log.consumed_date, [])
+            entries_per_date[log.consumed_date].append(
+                {
+                    "log_id": log.id,
+                    "food_item": FoodItemResponse.model_validate(log.food_item).model_dump()
+                    if log.food_item
+                    else None,
+                    "barcode": log.barcode,
+                    "servings": log.serving_multiplier,
+                    "calories": log.calories,
+                    "protein": log.protein,
+                    "carbs": log.carbs,
+                    "fat": log.fat,
+                    "notes": log.notes,
+                }
+            )
+
+        entries = []
+        cursor = end_date
+        while cursor >= start_date:
+            totals_for_day = totals.get(cursor, {"calories": 0.0, "protein": 0.0, "carbs": 0.0, "fat": 0.0})
+            entries.append(
+                {
+                    "date": cursor.isoformat(),
+                    "calories": round(totals_for_day["calories"], 2),
+                    "protein": round(totals_for_day["protein"], 2),
+                    "carbs": round(totals_for_day["carbs"], 2),
+                    "fat": round(totals_for_day["fat"], 2),
+                    "items": entries_per_date.get(cursor, []),
+                }
+            )
+            cursor -= timedelta(days=1)
+
+        return create_response(
+            message="Calorie summary fetched",
+            data={
+                "range": {"start": start_date.isoformat(), "end": end_date.isoformat()},
+                "entries": entries,
+            },
+            status_code=status.HTTP_200_OK,
+        )
+    except Exception as exc:
+        return handle_exception(exc)
+
+
+# @router.get("/logs/today")
+# def today_nutrition(
+#     db: Session = Depends(get_db),
+#     current_user: User = Depends(get_current_user),
+# ):
+#     try:
+#         today = date.today()
+#         logs = (
+#             db.query(FoodLog)
+#             .filter(FoodLog.user_id == current_user.id, FoodLog.consumed_date == today)
+#             .all()
+#         )
+
+#         total_calories = sum(log.calories or 0 for log in logs)
+#         total_protein = sum(log.protein or 0 for log in logs)
+#         total_carbs = sum(log.carbs or 0 for log in logs)
+#         total_fat = sum(log.fat or 0 for log in logs)
+
+#         return create_response(
+#             message="Today's nutrition fetched",
+#             data={
+#                 "date": today.isoformat(),
+#                 "calories": round(total_calories, 2),
+#                 "protein": round(total_protein, 2),
+#                 "carbs": round(total_carbs, 2),
+#                 "fat": round(total_fat, 2),
+#             },
+#             status_code=status.HTTP_200_OK,
+#         )
+#     except Exception as exc:
+#         return handle_exception(exc)

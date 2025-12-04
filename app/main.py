@@ -8,6 +8,7 @@ from app.database import Base, engine
 from app.routers import auth, profile, questions, videos, users,google_auth, answers, health, nutrition, water
 from app.utils.response import create_response, handle_exception
 from seed import run_seed
+from app.services.water_reminder_service import reminder_scheduler
 
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key=settings.JWT_SECRET)
@@ -27,8 +28,14 @@ app.add_middleware(
 
 # Seed default user on startup
 @app.on_event("startup")
-def startup_event():
+async def startup_event():
     run_seed()
+    await reminder_scheduler.start()
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    await reminder_scheduler.stop()
 
 # Add routes
 app.include_router(auth.router)

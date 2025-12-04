@@ -65,25 +65,25 @@ def upsert_steps(
         return handle_exception(exc)
 
 
-# @router.get("/steps/today")
-# def get_today_steps(
-#     db: Session = Depends(get_db),
-#     current_user: User = Depends(get_current_user),
-# ):
-#     try:
-#         today = date.today()
-#         step = (
-#             db.query(HealthStep)
-#             .filter(HealthStep.user_id == current_user.id, HealthStep.step_date == today)
-#             .first()
-#         )
-#         return create_response(
-#             message="Today's steps fetched successfully",
-#             data=_step_payload(step),
-#             status_code=status.HTTP_200_OK,
-#         )
-#     except Exception as exc:
-#         return handle_exception(exc)
+@router.get("/steps/today")
+def get_today_steps(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        today = date.today()
+        step = (
+            db.query(HealthStep)
+            .filter(HealthStep.user_id == current_user.id, HealthStep.step_date == today)
+            .first()
+        )
+        return create_response(
+            message="Today's steps fetched successfully",
+            data=_step_payload(step),
+            status_code=status.HTTP_200_OK,
+        )
+    except Exception as exc:
+        return handle_exception(exc)
 
 
 @router.get("/steps/history")

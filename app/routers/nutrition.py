@@ -222,34 +222,34 @@ def calorie_summary(
         return handle_exception(exc)
 
 
-# @router.get("/logs/today")
-# def today_nutrition(
-#     db: Session = Depends(get_db),
-#     current_user: User = Depends(get_current_user),
-# ):
-#     try:
-#         today = date.today()
-#         logs = (
-#             db.query(FoodLog)
-#             .filter(FoodLog.user_id == current_user.id, FoodLog.consumed_date == today)
-#             .all()
-#         )
+@router.get("/logs/today")
+def today_nutrition(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        today = date.today()
+        logs = (
+            db.query(FoodLog)
+            .filter(FoodLog.user_id == current_user.id, FoodLog.consumed_date == today)
+            .all()
+        )
 
-#         total_calories = sum(log.calories or 0 for log in logs)
-#         total_protein = sum(log.protein or 0 for log in logs)
-#         total_carbs = sum(log.carbs or 0 for log in logs)
-#         total_fat = sum(log.fat or 0 for log in logs)
+        total_calories = sum(log.calories or 0 for log in logs)
+        total_protein = sum(log.protein or 0 for log in logs)
+        total_carbs = sum(log.carbs or 0 for log in logs)
+        total_fat = sum(log.fat or 0 for log in logs)
 
-#         return create_response(
-#             message="Today's nutrition fetched",
-#             data={
-#                 "date": today.isoformat(),
-#                 "calories": round(total_calories, 2),
-#                 "protein": round(total_protein, 2),
-#                 "carbs": round(total_carbs, 2),
-#                 "fat": round(total_fat, 2),
-#             },
-#             status_code=status.HTTP_200_OK,
-#         )
-#     except Exception as exc:
-#         return handle_exception(exc)
+        return create_response(
+            message="Today's nutrition fetched",
+            data={
+                "date": today.isoformat(),
+                "calories": round(total_calories, 2),
+                "protein": round(total_protein, 2),
+                "carbs": round(total_carbs, 2),
+                "fat": round(total_fat, 2),
+            },
+            status_code=status.HTTP_200_OK,
+        )
+    except Exception as exc:
+        return handle_exception(exc)

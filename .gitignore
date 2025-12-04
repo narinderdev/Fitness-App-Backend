@@ -8,3 +8,4 @@ __pycache__/
 *.pyc
 credentials/credentials.json
 credentials/token.json
+credentials/FIREBASE_CREDENTIALS_FILE.json

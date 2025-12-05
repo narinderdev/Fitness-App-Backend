@@ -171,6 +171,15 @@ def send_water_reminder(
             current_user.id,
             len(tokens),
         )
+        invalid_tokens = result.get("invalid_tokens") or []
+        if invalid_tokens:
+            logger.info("Cleaning up %s invalid tokens for user %s", len(invalid_tokens), current_user.id)
+            (
+                db.query(DeviceToken)
+                .filter(DeviceToken.token.in_(invalid_tokens))
+                .delete(synchronize_session=False)
+            )
+            db.commit()
         return create_response(
             message="Reminder sent",
             data=result,

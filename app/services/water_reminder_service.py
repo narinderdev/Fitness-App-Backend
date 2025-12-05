@@ -61,6 +61,10 @@ class WaterReminderScheduler:
                 result.get("success"),
                 result.get("failure"),
             )
+            invalid_tokens = result.get("invalid_tokens") or []
+            if invalid_tokens:
+                logger.info("Automatic reminder removing %s invalid tokens", len(invalid_tokens))
+                self._remove_tokens(invalid_tokens)
         except Exception:
             logger.exception("Failed to send automatic water reminder")
 
@@ -70,6 +74,19 @@ class WaterReminderScheduler:
         try:
             token_rows = session.query(DeviceToken.token).all()
             return [token for (token,) in token_rows]
+        finally:
+            session.close()
+
+    @staticmethod
+    def _remove_tokens(tokens: list[str]) -> None:
+        if not tokens:
+            return
+        session = SessionLocal()
+        try:
+            session.query(DeviceToken).filter(DeviceToken.token.in_(tokens)).delete(synchronize_session=False)
+            session.commit()
+        except Exception:
+            logger.exception("Failed to delete invalid device tokens")
         finally:
             session.close()
 

@@ -7,6 +7,7 @@ from app.database import get_db
 from app.models.user import User
 from app.services.analytics_service import get_user_analytics
 from app.services.auth_middleware import get_current_admin, get_current_user
+from app.services.dashboard_service import get_dashboard_metrics
 from app.utils.response import create_response, handle_exception
 
 router = APIRouter(tags=["Analytics"])
@@ -56,3 +57,21 @@ def app_user_analytics(
     except Exception as exc:
         logger.exception("Failed to build analytics for user %s", current_user.id)
         return handle_exception(exc)
+
+
+@router.get("/admin/dashboard/metrics")
+def admin_dashboard_metrics(
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin),
+):
+    try:
+        logger.info("Admin %s requesting dashboard metrics", admin.id)
+        metrics = get_dashboard_metrics(db)
+        return create_response(
+            message="Dashboard metrics fetched",
+            data=metrics,
+            status_code=status.HTTP_200_OK,
+        )
+    except Exception:
+        logger.exception("Failed to build dashboard metrics for admin %s", admin.id)
+        return handle_exception(Exception("Failed to build dashboard metrics"))

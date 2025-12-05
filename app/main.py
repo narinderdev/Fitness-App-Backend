@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.database import Base, engine
-from app.routers import auth, profile, questions, videos, users,google_auth, answers, health, nutrition, water
+from app.routers import analytics, answers, auth, google_auth, health, nutrition, profile, questions, users, videos, water
 from app.utils.response import create_response, handle_exception
 from seed import run_seed
 from app.services.water_reminder_service import reminder_scheduler
@@ -48,6 +48,7 @@ app.include_router(users.router)
 app.include_router(health.router)
 app.include_router(nutrition.router)
 app.include_router(water.router)
+app.include_router(analytics.router)
 
 # Serve uploaded assets
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")

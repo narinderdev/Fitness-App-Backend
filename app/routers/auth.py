@@ -156,21 +156,8 @@ def verify_otp(body: VerifyOtp, db: Session = Depends(get_db)):
         jti = str(uuid.uuid4())
         token = create_access_token({"sub": user.email, "jti": jti})
 
-        session_record = (
-            db.query(UserSession)
-            .filter(UserSession.user_id == user.id)
-            .order_by(UserSession.id.asc())
-            .first()
-        )
-
-        if session_record:
-            session_record.jti = jti
-            session_record.token = token
-            session_record.is_active = True
-            session_record.revoked_at = None
-        else:
-            session_record = UserSession(user_id=user.id, jti=jti, token=token)
-            db.add(session_record)
+        session_record = UserSession(user_id=user.id, jti=jti, token=token)
+        db.add(session_record)
 
         db.commit()
         db.refresh(user)

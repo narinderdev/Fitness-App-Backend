@@ -87,24 +87,37 @@ def get_user_analytics(db: Session, user_id: int, days: int = 7) -> dict:
     logger.debug("Nutrition totals: %s", nutrition_map)
 
     entries: list[dict] = []
+    cumulative = {"water_ml": 0, "steps": 0, "calories": 0.0, "protein": 0.0, "carbs": 0.0, "fat": 0.0}
     cursor = end_date
     while cursor >= start_date:
         nutrition = nutrition_map.get(cursor, {"calories": 0.0, "protein": 0.0, "carbs": 0.0, "fat": 0.0})
-        entries.append(
-            {
-                "date": cursor.isoformat(),
-                "water_ml": water_map.get(cursor, 0),
-                "steps": step_map.get(cursor, 0),
-                "calories": round(nutrition["calories"], 2),
-                "protein": round(nutrition["protein"], 2),
-                "carbs": round(nutrition["carbs"], 2),
-                "fat": round(nutrition["fat"], 2),
-            }
-        )
+        entry = {
+            "date": cursor.isoformat(),
+            "water_ml": water_map.get(cursor, 0),
+            "steps": step_map.get(cursor, 0),
+            "calories": round(nutrition["calories"], 2),
+            "protein": round(nutrition["protein"], 2),
+            "carbs": round(nutrition["carbs"], 2),
+            "fat": round(nutrition["fat"], 2),
+        }
+        entries.append(entry)
+        cumulative["water_ml"] += entry["water_ml"]
+        cumulative["steps"] += entry["steps"]
+        cumulative["calories"] += entry["calories"]
+        cumulative["protein"] += entry["protein"]
+        cumulative["carbs"] += entry["carbs"]
+        cumulative["fat"] += entry["fat"]
         cursor -= timedelta(days=1)
+
+    days_count = max(len(entries), 1)
+    averages = {key: round(value / days_count, 2) for key, value in cumulative.items()}
+    today_entry = entries[0] if entries else None
 
     logger.info("Analytics ready for user_id=%s entries=%s", user_id, len(entries))
     return {
         "range": {"start": start_date.isoformat(), "end": end_date.isoformat()},
         "entries": entries,
+        "totals": {key: (round(value, 2) if isinstance(value, float) else value) for key, value in cumulative.items()},
+        "averages": averages,
+        "today": today_entry,
     }

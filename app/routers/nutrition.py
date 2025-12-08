@@ -87,28 +87,66 @@ async def create_log(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Provide food_item_id or barcode")
 
         consumed_date = date.fromisoformat(body.consumed_date) if body.consumed_date else date.today()
-        calories = protein = carbs = fat = None
-        if food_item:
-            calories = (food_item.calories or 0) * servings
-            protein = (food_item.protein or 0) * servings
-            carbs = (food_item.carbs or 0) * servings
-            fat = (food_item.fat or 0) * servings
 
-        log = FoodLog(
-            user_id=current_user.id,
-            food_item_id=food_item.id if food_item else None,
-            barcode=body.barcode if body.barcode else (food_item.barcode if food_item else None),
-            serving_multiplier=servings,
-            calories=calories,
-            protein=protein,
-            carbs=carbs,
-            fat=fat,
-            notes=body.notes,
-            consumed_date=consumed_date,
-        )
-        db.add(log)
-        db.commit()
-        db.refresh(log)
+        existing_log = None
+        barcode = body.barcode or (food_item.barcode if food_item else None)
+        food_item_id = food_item.id if food_item else None
+        if barcode:
+            existing_log = (
+                db.query(FoodLog)
+                .filter(
+                    FoodLog.user_id == current_user.id,
+                    FoodLog.consumed_date == consumed_date,
+                    FoodLog.barcode == barcode,
+                )
+                .first()
+            )
+        elif food_item_id:
+            existing_log = (
+                db.query(FoodLog)
+                .filter(
+                    FoodLog.user_id == current_user.id,
+                    FoodLog.consumed_date == consumed_date,
+                    FoodLog.food_item_id == food_item_id,
+                )
+                .first()
+            )
+
+        if existing_log:
+            existing_log.serving_multiplier += servings
+            if food_item:
+                existing_log.calories = (existing_log.calories or 0) + (food_item.calories or 0) * servings
+                existing_log.protein = (existing_log.protein or 0) + (food_item.protein or 0) * servings
+                existing_log.carbs = (existing_log.carbs or 0) + (food_item.carbs or 0) * servings
+                existing_log.fat = (existing_log.fat or 0) + (food_item.fat or 0) * servings
+            if body.notes is not None:
+                existing_log.notes = body.notes
+            db.commit()
+            db.refresh(existing_log)
+            log = existing_log
+        else:
+            calories = protein = carbs = fat = None
+            if food_item:
+                calories = (food_item.calories or 0) * servings
+                protein = (food_item.protein or 0) * servings
+                carbs = (food_item.carbs or 0) * servings
+                fat = (food_item.fat or 0) * servings
+
+            log = FoodLog(
+                user_id=current_user.id,
+                food_item_id=food_item.id if food_item else None,
+                barcode=body.barcode if body.barcode else (food_item.barcode if food_item else None),
+                serving_multiplier=servings,
+                calories=calories,
+                protein=protein,
+                carbs=carbs,
+                fat=fat,
+                notes=body.notes,
+                consumed_date=consumed_date,
+            )
+            db.add(log)
+            db.commit()
+            db.refresh(log)
 
         return create_response(
             message="Food log saved",

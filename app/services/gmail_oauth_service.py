@@ -90,7 +90,7 @@ OTP_TEMPLATE = """
             <!-- Logo -->
             <tr>
               <td align="center" style="padding-bottom:20px;">
-                <img src="https://glowante.blr1.cdn.digitaloceanspaces.com/fitness_app/logo.png" width="60" alt="Fitness App Logo" />
+                <img src="https://glowante.blr1.cdn.digitaloceanspaces.com/fitness_app/newlogo.png" width="60" alt="Fitness App Logo" />
               </td>
             </tr>
 

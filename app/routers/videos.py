@@ -69,15 +69,15 @@ def fetch_db_videos(
     current_user=Depends(get_current_user),
 ):
     try:
-        normalized = _resolve_category(category)
-        if not normalized:
+        requesting_all = category.strip().lower() == "all"
+        normalized = None if requesting_all else _resolve_category(category)
+        if not requesting_all and not normalized:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid category")
 
-        base_query = (
-            db.query(Video)
-            .filter(Video.body_part == normalized)
-            .order_by(Video.created_at.desc())
-        )
+        base_query = db.query(Video).order_by(Video.created_at.desc())
+        if normalized:
+            base_query = base_query.filter(Video.body_part == normalized)
+
         total = base_query.count()
         stored_videos = (
             base_query.offset((page - 1) * page_size)
@@ -93,7 +93,7 @@ def fetch_db_videos(
         return create_response(
             message="Videos fetched from database",
             data={
-                "category": normalized,
+                "category": "all" if requesting_all else normalized,
                 "source": "database",
                 **_pagination_meta(page, page_size, total, len(payload)),
                 "videos": payload,

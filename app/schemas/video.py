@@ -1,6 +1,6 @@
 from enum import Enum
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, AnyHttpUrl
 
 
 class GenderEnum(str, Enum):
@@ -15,6 +15,24 @@ class BodyPartEnum(str, Enum):
     new_arms = "NewArms"
     new_full_body = "NewFullBody"
     new_legs = "NewLegs"
+
+
+class VideoCreateRequest(BaseModel):
+    body_part: BodyPartEnum
+    gender: GenderEnum
+    title: str | None = None
+    description: str | None = None
+    video_url: AnyHttpUrl
+    thumbnail_url: AnyHttpUrl
+
+
+class VideoUpdateRequest(BaseModel):
+    body_part: BodyPartEnum | None = None
+    gender: GenderEnum | None = None
+    title: str | None = None
+    description: str | None = None
+    video_url: AnyHttpUrl | None = None
+    thumbnail_url: AnyHttpUrl | None = None
 
 
 class VideoResponse(BaseModel):

@@ -1,12 +1,7 @@
-import uuid
-from pathlib import Path
 from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
-    UploadFile,
-    File,
-    Form,
     Query,
     status,
 )
@@ -14,13 +9,16 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.video import Video
-from app.schemas.video import VideoResponse, BodyPartEnum, GenderEnum
-from app.services.auth_middleware import get_current_user
+from app.schemas.video import (
+    VideoResponse,
+    BodyPartEnum,
+    GenderEnum,
+    VideoCreateRequest,
+    VideoUpdateRequest,
+)
 from app.services.spaces_service import (
     get_videos_by_category,
     normalize_category,
-    upload_category_video,
-    upload_category_thumbnail,
 )
 from app.utils.response import create_response, handle_exception
 
@@ -31,16 +29,9 @@ router = APIRouter(
     tags=["Videos"],
 )
 
-ALLOWED_VIDEO_TYPES = {"video/mp4", "video/mpeg", "video/quicktime"}
-ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/jpg"}
 BODY_PART_VALUES = {bp.value for bp in BodyPartEnum}
 DEFAULT_PAGE_SIZE = 20
 MAX_PAGE_SIZE = 100
-
-
-def _safe_filename(body_part: str, original_name: str, fallback_ext: str) -> str:
-    extension = Path(original_name).suffix or fallback_ext
-    return f"{body_part.lower()}_{uuid.uuid4().hex}{extension.lower()}"
 
 
 def _resolve_category(category: str) -> str | None:
@@ -136,44 +127,19 @@ def fetch_spaces_videos(
 
 
 @router.post("/upload")
-async def upload_video(
-    body_part: BodyPartEnum = Form(...),
-    gender: GenderEnum = Form(...),
-    title: str | None = Form(None),
-    description: str | None = Form(None),
-    video_file: UploadFile = File(...),
-    thumbnail_file: UploadFile = File(...),
+def upload_video(
+    payload: VideoCreateRequest,
     db: Session = Depends(get_db),
     current_admin=Depends(get_current_admin),
 ):
     try:
-        video_type = video_file.content_type or ""
-        thumb_type = thumbnail_file.content_type or ""
-
-        if video_type.lower() not in ALLOWED_VIDEO_TYPES:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported video format")
-
-        if thumb_type.lower() not in ALLOWED_IMAGE_TYPES:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported thumbnail format")
-
-        normalized_body_part = body_part.value
-
-        video_filename = _safe_filename(normalized_body_part, video_file.filename or "video.mp4", ".mp4")
-        thumbnail_filename = _safe_filename(normalized_body_part, thumbnail_file.filename or "thumbnail.jpg", ".jpg")
-
-        video_bytes = await video_file.read()
-        thumbnail_bytes = await thumbnail_file.read()
-
-        video_url = upload_category_video(video_bytes, video_filename, normalized_body_part, video_type)
-        thumbnail_url = upload_category_thumbnail(thumbnail_bytes, thumbnail_filename, normalized_body_part, thumb_type)
-
         new_video = Video(
-            title=title,
-            description=description,
-            body_part=normalized_body_part,
-            gender=gender.value,
-            video_url=video_url,
-            thumbnail_url=thumbnail_url,
+            title=payload.title,
+            description=payload.description,
+            body_part=payload.body_part.value,
+            gender=payload.gender.value,
+            video_url=str(payload.video_url),
+            thumbnail_url=str(payload.thumbnail_url),
         )
         db.add(new_video)
         db.commit()
@@ -190,14 +156,9 @@ async def upload_video(
 
 
 @router.put("/{video_id}")
-async def update_video(
+def update_video(
     video_id: int,
-    body_part: BodyPartEnum | None = Form(None),
-    gender: GenderEnum | None = Form(None),
-    title: str | None = Form(None),
-    description: str | None = Form(None),
-    video_file: UploadFile | None = File(None),
-    thumbnail_file: UploadFile | None = File(None),
+    payload: VideoUpdateRequest,
     db: Session = Depends(get_db),
     current_admin=Depends(get_current_admin),
 ):
@@ -206,30 +167,18 @@ async def update_video(
         if not video:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
 
-        if body_part:
-            video.body_part = body_part.value
-        if gender:
-            video.gender = gender.value
-        if title is not None:
-            video.title = title
-        if description is not None:
-            video.description = description
-
-        if video_file:
-            if (video_file.content_type or "").lower() not in ALLOWED_VIDEO_TYPES:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported video format")
-            new_video_filename = _safe_filename(video.body_part, video_file.filename or "video.mp4", ".mp4")
-            video_bytes = await video_file.read()
-            video.video_url = upload_category_video(video_bytes, new_video_filename, video.body_part, video_file.content_type)
-
-        if thumbnail_file:
-            if (thumbnail_file.content_type or "").lower() not in ALLOWED_IMAGE_TYPES:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported thumbnail format")
-            new_thumb_filename = _safe_filename(video.body_part, thumbnail_file.filename or "thumbnail.jpg", ".jpg")
-            thumbnail_bytes = await thumbnail_file.read()
-            video.thumbnail_url = upload_category_thumbnail(
-                thumbnail_bytes, new_thumb_filename, video.body_part, thumbnail_file.content_type
-            )
+        if payload.body_part:
+            video.body_part = payload.body_part.value
+        if payload.gender:
+            video.gender = payload.gender.value
+        if payload.title is not None:
+            video.title = payload.title
+        if payload.description is not None:
+            video.description = payload.description
+        if payload.video_url is not None:
+            video.video_url = str(payload.video_url)
+        if payload.thumbnail_url is not None:
+            video.thumbnail_url = str(payload.thumbnail_url)
 
         db.commit()
         db.refresh(video)

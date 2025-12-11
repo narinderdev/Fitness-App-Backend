@@ -13,6 +13,7 @@ s3 = session.client(
 
 BUCKET = os.getenv("SPACES_NAME")
 CDN_URL = os.getenv("SPACES_CDN_URL")
+BASE_PATH = (os.getenv("DO_SPACES_BASE_PATH") or "fitness_app").strip("/")
 
 # EXACT category mapping based on your DigitalOcean folders
 CATEGORY_MAP = {
@@ -29,6 +30,11 @@ def normalize_category(cat: str):
     return CATEGORY_MAP.get(key)
 
 
+def _join_path(*segments: str) -> str:
+    cleaned = [segment.strip("/") for segment in segments if segment and segment.strip("/")]
+    return "/".join(cleaned)
+
+
 def get_videos_by_category(category: str):
     real_category = normalize_category(category)
 
@@ -36,7 +42,8 @@ def get_videos_by_category(category: str):
         print("❌ Invalid category:", category)
         return []
 
-    prefix = f"fitness_app/{real_category}/"
+    prefix_root = _join_path(BASE_PATH, real_category)
+    prefix = f"{prefix_root}/" if prefix_root else ""
 
     print("📌 DEBUG PREFIX:", prefix)
 
@@ -73,10 +80,11 @@ def _upload_file(data: bytes, key: str, content_type: str | None = None) -> str:
 
 
 def _build_key(body_part: str, filename: str, subfolder: str | None = None) -> str:
-    prefix = f"fitness_app/{body_part}"
+    parts = [BASE_PATH, body_part]
     if subfolder:
-        prefix = f"{prefix}/{subfolder.strip('/')}"
-    return f"{prefix}/{filename}"
+        parts.append(subfolder)
+    parts.append(filename)
+    return _join_path(*parts)
 
 
 def upload_category_video(data: bytes, filename: str, body_part: str, content_type: str | None = None) -> str:

@@ -1,0 +1,1 @@
+"""Fitness backend application package."""

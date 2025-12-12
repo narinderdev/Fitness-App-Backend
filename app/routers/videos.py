@@ -30,6 +30,14 @@ router = APIRouter(
 )
 
 BODY_PART_VALUES = {bp.value for bp in BodyPartEnum}
+CATEGORY_DB_ALIASES = {
+    "Core": ["Core", "NewCore"],
+    "Arms": ["Arms", "NewArms"],
+    "FullBody": ["FullBody", "NewFullBody"],
+    "Legs": ["Legs", "NewLegs"],
+    "FullBodyStrength": ["FullBodyStrength"],
+    "SportNutrition": ["SportNutrition"],
+}
 DEFAULT_PAGE_SIZE = 20
 MAX_PAGE_SIZE = 100
 
@@ -39,6 +47,10 @@ def _resolve_category(category: str) -> str | None:
     if not normalized and category in BODY_PART_VALUES:
         normalized = category
     return normalized
+
+
+def _db_values_for_category(category: str) -> list[str]:
+    return CATEGORY_DB_ALIASES.get(category, [category])
 
 
 def _pagination_meta(page: int, page_size: int, total: int, count: int) -> dict:
@@ -67,7 +79,8 @@ def fetch_db_videos(
 
         base_query = db.query(Video).order_by(Video.created_at.desc())
         if normalized:
-            base_query = base_query.filter(Video.body_part == normalized)
+            db_values = _db_values_for_category(normalized)
+            base_query = base_query.filter(Video.body_part.in_(db_values))
 
         total = base_query.count()
         stored_videos = (

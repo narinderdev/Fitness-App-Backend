@@ -11,10 +11,10 @@ class GenderEnum(str, Enum):
 
 
 class BodyPartEnum(str, Enum):
-    new_core = "NewCore"
-    new_arms = "NewArms"
-    new_full_body = "NewFullBody"
-    new_legs = "NewLegs"
+    core = "Core"
+    arms = "Arms"
+    full_body = "FullBody"
+    legs = "Legs"
     full_body_strength = "FullBodyStrength"
     sport_nutrition = "SportNutrition"
 

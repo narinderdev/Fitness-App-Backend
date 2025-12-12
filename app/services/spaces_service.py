@@ -17,10 +17,14 @@ BASE_PATH = (os.getenv("DO_SPACES_BASE_PATH") or "fitness_app").strip("/")
 
 # EXACT category mapping based on your DigitalOcean folders
 CATEGORY_MAP = {
-    "newarms": "NewArms",
-    "newcore": "NewCore",
-    "newfullbody": "NewFullBody",
-    "newlegs": "NewLegs",
+    "arms": "Arms",
+    "core": "Core",
+    "fullbody": "FullBody",
+    "legs": "Legs",
+    "newarms": "Arms",
+    "newcore": "Core",
+    "newfullbody": "FullBody",
+    "newlegs": "Legs",
     "fullbodystrength": "FullBodyStrength",
     "fullbodystregth": "FullBodyStrength",
     "sportnutrition": "SportNutrition",

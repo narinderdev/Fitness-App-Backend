@@ -13,12 +13,13 @@ from app.schemas.question import (
     QuestionUpdate,
 )
 from app.services.auth_middleware import get_current_user, get_current_admin
+from app.services.questionnaire_service import get_pending_required_questions
 from app.utils.response import create_response, handle_exception
+from app.constants import DEFAULT_ALL_GENDER_LABEL
 
 router = APIRouter(prefix="/questions", tags=["Questions"])
 
 CHOICE_TYPES = {AnswerTypeEnum.single_choice.value, AnswerTypeEnum.multi_choice.value}
-DEFAULT_ALL_GENDER_LABEL = "Both"
 
 
 def _question_payload(question: Question) -> dict:
@@ -172,6 +173,23 @@ def list_questions(
         payload = [_question_payload(question) for question in questions]
         return create_response(
             message="Questions fetched successfully",
+            data={"count": len(payload), "questions": payload},
+            status_code=status.HTTP_200_OK,
+        )
+    except Exception as exc:
+        return handle_exception(exc)
+
+
+@router.get("/pending")
+def pending_questions(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        pending = get_pending_required_questions(db, current_user)
+        payload = [_question_payload(question) for question in pending]
+        return create_response(
+            message="Pending questions fetched successfully",
             data={"count": len(payload), "questions": payload},
             status_code=status.HTTP_200_OK,
         )

@@ -77,3 +77,21 @@ def home():
         )
     except Exception as exc:
         return handle_exception(exc)
+
+
+@app.get("/api-info")
+def api_info():
+    try:
+        return create_response(
+            message="API information",
+            data={
+                "service": settings.PROJECT_NAME,
+                "version": "1.0.0",
+                "docs_url": "/docs",
+                "openapi_url": "/openapi.json",
+                "health_check": "/health",
+            },
+            status_code=status.HTTP_200_OK,
+        )
+    except Exception as exc:
+        return handle_exception(exc)

@@ -20,7 +20,11 @@ CATEGORY_MAP = {
     "newarms": "NewArms",
     "newcore": "NewCore",
     "newfullbody": "NewFullBody",
-    "newlegs": "NewLegs"
+    "newlegs": "NewLegs",
+    "fullbodystrength": "FullBodyStrength",
+    "fullbodystregth": "FullBodyStrength",
+    "sportnutrition": "SportNutrition",
+    "sportsnutrition": "SportNutrition",
 }
 
 

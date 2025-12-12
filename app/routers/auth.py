@@ -12,6 +12,7 @@ from app.schemas.user import RequestOtp, VerifyOtp, PlatformEnum
 from app.services.gmail_oauth_service import send_email_otp
 from app.services.auth_service import create_access_token
 from app.services.auth_middleware import get_current_session
+from app.services.questionnaire_service import count_pending_required_questions
 from app.utils.response import create_response, handle_exception
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -163,13 +164,16 @@ def verify_otp(body: VerifyOtp, db: Session = Depends(get_db)):
         db.refresh(user)
 
         profile_complete = bool(user.first_name and user.last_name)
+        pending_question_count = count_pending_required_questions(db, user)
 
         return create_response(
             message="OTP verified successfully",
             data={
                 "access_token": token,
                 "token_type": "bearer",
-                "profile_complete": profile_complete
+                "profile_complete": profile_complete,
+                "pending_question_count": pending_question_count,
+                "has_pending_questions": pending_question_count > 0,
             },
             status_code=status.HTTP_200_OK
         )

@@ -4,6 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
+from app.models.health import HealthStep
+from app.models.nutrition import FoodLog
+from app.models.question import UserAnswer
+from app.models.user_session import UserSession
+from app.models.water import DeviceToken, WaterLog
 from app.schemas.user import ProfileResponse, ProfileUpdate
 from app.services.auth_middleware import get_current_user
 from app.utils.response import create_response, handle_exception
@@ -71,8 +76,26 @@ def delete_account(
         if not user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-        user.is_active = False
-        user.otp = None
+        related_models = (
+            FoodLog,
+            HealthStep,
+            UserAnswer,
+            WaterLog,
+            DeviceToken,
+            UserSession,
+        )
+
+        for model in related_models:
+            db.query(model).filter(model.user_id == user.id).delete(synchronize_session=False)
+
+        if user.photo:
+            photo_path = Path(user.photo)
+            try:
+                photo_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+        db.delete(user)
         db.commit()
 
         return create_response(

@@ -15,6 +15,8 @@ class BodyPartEnum(str, Enum):
     new_arms = "NewArms"
     new_full_body = "NewFullBody"
     new_legs = "NewLegs"
+    full_body_strength = "FullBodyStrength"
+    sport_nutrition = "SportNutrition"
 
 
 class VideoCreateRequest(BaseModel):

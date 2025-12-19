@@ -6,6 +6,8 @@ from app.models.question import AnswerOption, Question, UserAnswer, UserAnswerOp
 from app.models.user import User
 from app.schemas.answers import UserAnswerCreate, UserAnswerResponse, UserAnswerOptionResponse
 from app.services.auth_middleware import get_current_user
+from app.services.bmi_service import recalculate_user_bmi
+from app.services.weight_service import add_weight_log_from_answer
 from app.utils.response import create_response, handle_exception
 
 router = APIRouter(prefix="/answers", tags=["Answers"])
@@ -88,12 +90,24 @@ def submit_answer(
                     )
                 db.add(UserAnswerOption(user_answer_id=answer.id, option_id=option_id))
 
+        db.flush()
+        bmi_payload = None
+        include_bmi = question.answer_type in {"weight", "height"}
+        if question.answer_type == "weight":
+            add_weight_log_from_answer(db, current_user, answer)
+        if include_bmi:
+            bmi_result = recalculate_user_bmi(db, current_user)
+            bmi_payload = bmi_result if bmi_result is not None else {"value": None, "category": None}
+
         db.commit()
         db.refresh(answer)
         payload = _answer_payload(answer)
+        response_data = {"answer": payload}
+        if include_bmi:
+            response_data["bmi"] = bmi_payload
         return create_response(
             message="Answer submitted successfully",
-            data=payload,
+            data=response_data,
             status_code=status.HTTP_201_CREATED,
         )
     except Exception as exc:

@@ -1,14 +1,430 @@
 import os
 from dotenv import load_dotenv
+from sqlalchemy import inspect, text, func
 
 from app.database import Base, engine, SessionLocal
 from app.models.user import User
+from app.models.program import Program, ProgramDay
+from app.models.nutrition import FoodCategory, FoodItem, FoodLog
+
+FREE_WEEK_TEMPLATE = [
+    {
+        "title": "Full Body Ignite",
+        "focus": "Strength",
+        "summary": "Compound strength circuits to activate every muscle group.",
+        "description": "Bodyweight strength work paired with low-impact cardio finishers.",
+        "duration": 30,
+        "is_rest_day": False,
+    },
+    {
+        "title": "Cardio Core Burn",
+        "focus": "Endurance",
+        "summary": "Interval work that keeps the heart rate lifted while sculpting the core.",
+        "description": "Alternating cardio ladders with core planks keeps training simple but challenging.",
+        "duration": 28,
+        "is_rest_day": False,
+    },
+    {
+        "title": "Mobility + Balance",
+        "focus": "Mobility",
+        "summary": "Slow, controlled flows that improve range of motion.",
+        "description": "Hinge, twist, and balance drills to offset long work days.",
+        "duration": 25,
+        "is_rest_day": False,
+    },
+    {
+        "title": "Strength Intervals",
+        "focus": "Strength",
+        "summary": "Classic interval format focused on lower-body power.",
+        "description": "Squat and lunge variations with tempo cues keep things spicy.",
+        "duration": 30,
+        "is_rest_day": False,
+    },
+    {
+        "title": "Mindful Sweat",
+        "focus": "Cardio",
+        "summary": "Low-impact cardio session that prioritizes breathing and form.",
+        "description": "Perfect for smaller spaces—no equipment and minimal jumping.",
+        "duration": 24,
+        "is_rest_day": False,
+    },
+    {
+        "title": "Active Recovery",
+        "focus": "Recovery",
+        "summary": "Guided stretching and mobility to keep joints happy.",
+        "description": "Focus on hips, shoulders, and spine with foam rolling prompts.",
+        "duration": 20,
+        "is_rest_day": True,
+    },
+    {
+        "title": "Complete Rest",
+        "focus": "Mindfulness",
+        "summary": "Let the body fully recover—hydration and light walking encouraged.",
+        "description": "Use this day to reset intentions for the week ahead.",
+        "duration": None,
+        "is_rest_day": True,
+    },
+]
+
+PREMIUM_WEEK_TEMPLATE = [
+    {
+        "title": "Power Foundations",
+        "focus": "Strength",
+        "summary": "Progressive overload session alternating tempo and rep schemes.",
+        "description": "Each week layers more reps or resistance for measurable gains.",
+        "duration": 32,
+        "is_rest_day": False,
+    },
+    {
+        "title": "Metabolic Conditioning",
+        "focus": "Endurance",
+        "summary": "Timed efforts with programmed rest for sustainable pacing.",
+        "description": "Includes options for dumbbells or bodyweight only formats.",
+        "duration": 30,
+        "is_rest_day": False,
+    },
+    {
+        "title": "Core + Mobility Reset",
+        "focus": "Mobility",
+        "summary": "Integrates Pilates-inspired core work with mobility drills.",
+        "description": "Improves posture and reinforces core activation for heavy days.",
+        "duration": 26,
+        "is_rest_day": False,
+    },
+    {
+        "title": "Athletic Conditioning",
+        "focus": "Agility",
+        "summary": "Power moves, plyometrics, and agility ladders to stay explosive.",
+        "description": "Includes low-impact options so everyone can participate.",
+        "duration": 28,
+        "is_rest_day": False,
+    },
+    {
+        "title": "Strength Endurance",
+        "focus": "Strength",
+        "summary": "Longer working sets that challenge stamina and grit.",
+        "description": "Alternates unilateral and bilateral moves each week.",
+        "duration": 34,
+        "is_rest_day": False,
+    },
+    FREE_WEEK_TEMPLATE[5],  # Active recovery reused
+    FREE_WEEK_TEMPLATE[6],  # Complete rest reused
+]
+
+DEFAULT_FOOD_CATEGORIES = [
+    {"name": "Fruits", "slug": "fruits", "description": "Fresh fruits and berries.", "sort_order": 1},
+    {"name": "Vegetables", "slug": "vegetables", "description": "Leafy greens and veggies.", "sort_order": 2},
+    {"name": "Proteins", "slug": "proteins", "description": "Lean protein sources.", "sort_order": 3},
+    {"name": "Grains", "slug": "grains", "description": "Whole grains and carbs.", "sort_order": 4},
+    {"name": "Snacks", "slug": "snacks", "description": "Quick bites.", "sort_order": 5},
+]
+
+DEFAULT_FOODS = [
+    {
+        "name": "Apple",
+        "category_slug": "fruits",
+        "calories": 95,
+        "protein": 0.5,
+        "carbs": 25,
+        "fat": 0.3,
+        "serving_quantity": 1,
+        "serving_unit": "medium (182g)",
+    },
+    {
+        "name": "Banana",
+        "category_slug": "fruits",
+        "calories": 105,
+        "protein": 1.3,
+        "carbs": 27,
+        "fat": 0.3,
+        "serving_quantity": 1,
+        "serving_unit": "medium (118g)",
+    },
+    {
+        "name": "Baby Spinach",
+        "category_slug": "vegetables",
+        "calories": 20,
+        "protein": 2.0,
+        "carbs": 3.4,
+        "fat": 0.3,
+        "serving_quantity": 2,
+        "serving_unit": "cups (raw)",
+    },
+    {
+        "name": "Grilled Chicken Breast",
+        "category_slug": "proteins",
+        "calories": 165,
+        "protein": 31,
+        "carbs": 0,
+        "fat": 3.6,
+        "serving_quantity": 1,
+        "serving_unit": "serving (113g)",
+    },
+    {
+        "name": "Quinoa (cooked)",
+        "category_slug": "grains",
+        "calories": 222,
+        "protein": 8,
+        "carbs": 39,
+        "fat": 3.6,
+        "serving_quantity": 1,
+        "serving_unit": "cup",
+    },
+    {
+        "name": "Almond Butter",
+        "category_slug": "snacks",
+        "calories": 98,
+        "fat": 9,
+        "protein": 3.4,
+        "carbs": 3.4,
+        "serving_quantity": 1,
+        "serving_unit": "tablespoon",
+    },
+]
 
 # Load environment variables
 load_dotenv()
 
 # Ensure all tables exist
 Base.metadata.create_all(bind=engine)
+
+
+def _ensure_bmi_columns():
+    """Add new BMI columns for legacy databases that predate the schema change."""
+    inspector = inspect(engine)
+    column_names = {col["name"] for col in inspector.get_columns("users")}
+    statements = []
+    if "bmi_value" not in column_names:
+        statements.append("ALTER TABLE users ADD COLUMN bmi_value DOUBLE PRECISION")
+    if "bmi_category" not in column_names:
+        statements.append("ALTER TABLE users ADD COLUMN bmi_category TEXT")
+    if not statements:
+        return
+    with engine.begin() as connection:
+        for statement in statements:
+            connection.execute(text(statement))
+            print(f"✔ Applied migration: {statement}")
+
+
+_ensure_bmi_columns()
+
+
+def _ensure_food_schema():
+    inspector = inspect(engine)
+    tables = inspector.get_table_names()
+    if "food_categories" not in tables:
+        FoodCategory.__table__.create(engine)
+        print("✔ Created food_categories table")
+
+    statements = []
+    food_columns = {col["name"] for col in inspector.get_columns("food_items")}
+    if "description" not in food_columns:
+        statements.append("ALTER TABLE food_items ADD COLUMN description TEXT")
+    if "category_id" not in food_columns:
+        statements.append("ALTER TABLE food_items ADD COLUMN category_id INTEGER REFERENCES food_categories(id) ON DELETE SET NULL")
+    if "is_active" not in food_columns:
+        statements.append("ALTER TABLE food_items ADD COLUMN is_active BOOLEAN DEFAULT TRUE")
+    # allow manual foods without barcodes
+    with engine.begin() as connection:
+        if "barcode" in food_columns:
+            connection.execute(text("ALTER TABLE food_items ALTER COLUMN barcode DROP NOT NULL"))
+        for statement in statements:
+            connection.execute(text(statement))
+            print(f"✔ Applied migration: {statement}")
+
+
+_ensure_food_schema()
+
+
+def _backfill_manual_log_macros(db):
+    """Populate missing macro totals for existing manual food logs."""
+    logs = (
+        db.query(FoodLog)
+        .join(FoodItem, FoodLog.food_item_id == FoodItem.id)
+        .filter(FoodItem.source == "manual")
+        .all()
+    )
+    updates = 0
+
+    for log in logs:
+        item = log.food_item
+        if not item:
+            continue
+        servings = log.serving_multiplier or 1.0
+        changed = False
+
+        def update_field(field: str, item_value: float | None):
+            nonlocal changed
+            if item_value is None:
+                return
+            current_value = getattr(log, field)
+            if current_value is None or current_value == 0:
+                setattr(log, field, item_value * servings)
+                changed = True
+
+        update_field("calories", item.calories)
+        update_field("protein", item.protein)
+        update_field("carbs", item.carbs)
+        update_field("fat", item.fat)
+
+        if changed:
+            updates += 1
+
+    if updates:
+        db.commit()
+        print(f"✔ Backfilled macros for {updates} manual food logs")
+def _build_days(program: Program, template: list[dict]):
+    days = []
+    total_days = program.duration_days
+    pattern_length = len(template)
+    for index in range(total_days):
+        config = template[index % pattern_length]
+        week = index // pattern_length + 1
+        ordinal = index + 1
+        description = config.get("description")
+        if description:
+            description = f"Week {week}: {description}"
+        day = ProgramDay(
+            program_id=program.id,
+            day_number=ordinal,
+            title=f"Day {ordinal}: {config['title']}",
+            focus=config.get("focus"),
+            description=description,
+            is_rest_day=config.get("is_rest_day", False),
+            workout_summary=config.get("summary"),
+            duration_minutes=config.get("duration"),
+            tips=config.get("tips"),
+        )
+        days.append(day)
+    return days
+
+
+def seed_programs(db):
+    programs_to_seed = [
+        {
+            "slug": "28-day-free-plan",
+            "title": "28-Day Free Plan",
+            "subtitle": "Five guided workouts plus intentional rest each week.",
+            "description": "A structured month-long routine that builds consistency without needing equipment.",
+            "duration_days": 28,
+            "workouts_per_week": 5,
+            "rest_days_per_week": 2,
+            "level": "Beginner",
+            "access_level": "free",
+            "cta_label": "Join for Free",
+            "hero_image_url": None,
+            "cover_image_url": None,
+            "is_active": True,
+            "is_featured": True,
+            "template": FREE_WEEK_TEMPLATE,
+        },
+        {
+            "slug": "60-day-premium-plan",
+            "title": "60-Day Premium Plan",
+            "subtitle": "Expanded coaching, more progressive overload, and deeper recovery.",
+            "description": "A comprehensive two-month roadmap that extends the free plan progression for premium members.",
+            "duration_days": 60,
+            "workouts_per_week": 5,
+            "rest_days_per_week": 2,
+            "level": "Intermediate",
+            "access_level": "paid",
+            "cta_label": "Unlock with Premium",
+            "hero_image_url": None,
+            "cover_image_url": None,
+            "is_active": True,
+            "is_featured": False,
+            "template": PREMIUM_WEEK_TEMPLATE,
+        },
+    ]
+
+    for config in programs_to_seed:
+        existing = db.query(Program).filter(Program.slug == config["slug"]).first()
+        if existing:
+            continue
+        template = config.pop("template")
+        program = Program(**config)
+        db.add(program)
+        db.flush()
+        db.bulk_save_objects(_build_days(program, template))
+        print(f"✔ Seeded program '{program.title}' with {program.duration_days} days")
+
+
+def seed_food_catalog(db):
+    slug_to_category = {}
+    for config in DEFAULT_FOOD_CATEGORIES:
+        slug = config["slug"]
+        existing = (
+            db.query(FoodCategory)
+            .filter(func.lower(FoodCategory.slug) == slug.lower())
+            .first()
+        )
+        if existing:
+            slug_to_category[slug] = existing
+            continue
+        category = FoodCategory(
+            name=config["name"],
+            slug=slug,
+            description=config.get("description"),
+            sort_order=config.get("sort_order", 0),
+            is_active=True,
+        )
+        db.add(category)
+        db.flush()
+        slug_to_category[slug] = category
+        print(f"✔ Seeded food category '{category.name}'")
+
+    for entry in DEFAULT_FOODS:
+        name = entry["name"]
+        existing = (
+            db.query(FoodItem)
+            .filter(
+                func.lower(FoodItem.product_name) == name.lower(),
+                FoodItem.source == "manual",
+            )
+            .first()
+        )
+        category = slug_to_category.get(entry.get("category_slug"))
+        if existing:
+            updated = False
+
+            def maybe_set(field: str):
+                nonlocal updated
+                value = entry.get(field)
+                if value is None:
+                    return
+                current = getattr(existing, field)
+                if current is None:
+                    setattr(existing, field, value)
+                    updated = True
+
+            maybe_set("calories")
+            maybe_set("protein")
+            maybe_set("carbs")
+            maybe_set("fat")
+            maybe_set("serving_quantity")
+            maybe_set("serving_unit")
+            if category and existing.category_id is None:
+                existing.category_id = category.id
+                updated = True
+            if updated:
+                print(f"✔ Updated nutrition facts for '{existing.product_name}'")
+            continue
+        food = FoodItem(
+            product_name=name,
+            calories=entry.get("calories"),
+            protein=entry.get("protein"),
+            carbs=entry.get("carbs"),
+            fat=entry.get("fat"),
+            serving_quantity=entry.get("serving_quantity", 1.0),
+            serving_unit=entry.get("serving_unit", "serving"),
+            source="manual",
+            category_id=category.id if category else None,
+            is_active=True,
+        )
+        db.add(food)
+        print(f"✔ Seeded food '{name}'")
+    db.commit()
+
 
 def run_seed():
     db = SessionLocal()
@@ -39,6 +455,11 @@ def run_seed():
             print("✔ Default admin user seeded!")
         else:
             print("✔ Users already present, skipping seeding.")
+
+        seed_programs(db)
+        seed_food_catalog(db)
+        _backfill_manual_log_macros(db)
+        db.commit()
     except Exception as e:
         print("❌ Seeding error:", e)
     finally:

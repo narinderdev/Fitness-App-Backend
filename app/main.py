@@ -12,12 +12,14 @@ from app.routers import (
     google_auth,
     health,
     nutrition,
+    programs,
     profile,
     questions,
     subscription_plans,
     users,
     videos,
     water,
+    weight,
 )
 from app.utils.response import create_response, handle_exception
 from seed import run_seed
@@ -60,9 +62,12 @@ app.include_router(videos.router)
 app.include_router(users.router)
 app.include_router(health.router)
 app.include_router(nutrition.router)
+app.include_router(nutrition.admin_router)
 app.include_router(water.router)
+app.include_router(weight.router)
 app.include_router(analytics.router)
 app.include_router(subscription_plans.router)
+app.include_router(programs.router)
 
 # Serve uploaded assets
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")

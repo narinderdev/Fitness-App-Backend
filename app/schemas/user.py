@@ -28,6 +28,8 @@ class ProfileUpdate(BaseModel):
     dob: str | None = None
     gender: str | None = None
     photo: str | None = None  # base64 or URL
+    bmi_value: float | None = None
+    bmi_category: str | None = None
 
 
 class ProfileResponse(BaseModel):
@@ -39,6 +41,8 @@ class ProfileResponse(BaseModel):
     dob: str | None
     gender: str | None
     photo: str | None
+    bmi_value: float | None
+    bmi_category: str | None
     is_active: bool
     is_admin: bool
 

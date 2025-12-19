@@ -31,9 +31,15 @@ async def fetch_product(barcode: str) -> dict | None:
 
 def map_product(product: dict) -> dict:
     nutriments = product.get("nutriments", {})
+    name = (
+        product.get("product_name")
+        or product.get("product_name_en")
+        or product.get("generic_name")
+        or "Food item"
+    )
     return {
         "barcode": product.get("code"),
-        "product_name": product.get("product_name"),
+        "product_name": name,
         "brand": product.get("brands"),
         "calories": _to_float(nutriments.get("energy-kcal_serving")),
         "protein": _to_float(nutriments.get("proteins_serving")),
@@ -42,6 +48,8 @@ def map_product(product: dict) -> dict:
         "serving_quantity": _to_float(product.get("serving_quantity") or nutriments.get("serving_quantity")),
         "serving_unit": product.get("serving_size"),
         "image_url": product.get("image_front_thumb_url") or product.get("image_url"),
+        "source": "openfoodfacts",
+        "is_active": True,
     }
 
 

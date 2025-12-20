@@ -114,16 +114,6 @@ def create_plan(
 ):
     del admin
     try:
-        existing = (
-            db.query(SubscriptionPlan)
-            .filter(SubscriptionPlan.duration_months == body.duration_months)
-            .first()
-        )
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"A {body.duration_months}-month plan already exists.",
-            )
         data = body.model_dump()
         duration = data["duration_months"]
         if not data.get("monthly_equivalent"):

@@ -39,6 +39,35 @@ def _normalize_slug(slug: str) -> str:
     return slug.strip().lower().replace(" ", "-")
 
 
+def _resolve_slug_candidate(slug: str | None, fallback_title: str | None = None) -> str:
+    base = _normalize_slug(slug or "")
+    if base:
+        return base
+    fallback = _normalize_slug(fallback_title or "")
+    if fallback:
+        return fallback
+    return "program"
+
+
+def _ensure_unique_program_slug(
+    db: Session,
+    slug: str,
+    exclude_program_id: int | None = None,
+) -> str:
+    base = slug or "program"
+    candidate = base
+    counter = 2
+    while True:
+        query = db.query(Program).filter(Program.slug == candidate)
+        if exclude_program_id:
+            query = query.filter(Program.id != exclude_program_id)
+        exists = query.first()
+        if not exists:
+            return candidate
+        candidate = f"{base}-{counter}"
+        counter += 1
+
+
 def _program_payload(program: Program, preview_days: Iterable[ProgramDay] | None = None) -> dict:
     access = _access_enum(program.access_level)
     preview = [
@@ -292,10 +321,10 @@ def create_program(
 ):
     del admin
     try:
-        slug = _normalize_slug(body.slug)
-        existing = db.query(Program).filter(Program.slug == slug).first()
-        if existing:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Plan already added.")
+        slug = _ensure_unique_program_slug(
+            db,
+            _resolve_slug_candidate(body.slug, body.title),
+        )
         program = Program(
             slug=slug,
             title=body.title.strip(),
@@ -338,16 +367,9 @@ def update_program(
     try:
         program = _program_by_identifier(db, program_identifier)
         update_data = body.model_dump(exclude_unset=True)
-        if "slug" in update_data and update_data["slug"]:
-            slug = _normalize_slug(update_data["slug"])
-            duplicate = (
-                db.query(Program)
-                .filter(Program.slug == slug, Program.id != program.id)
-                .first()
-            )
-            if duplicate:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Plan already added.")
-            update_data["slug"] = slug
+        if "slug" in update_data:
+            slug_candidate = _resolve_slug_candidate(update_data.get("slug"), update_data.get("title", program.title))
+            update_data["slug"] = _ensure_unique_program_slug(db, slug_candidate, exclude_program_id=program.id)
         for field, value in update_data.items():
             if hasattr(program, field):
                 setattr(program, field, value)

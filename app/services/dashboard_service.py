@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.models.user import User
 from app.models.video import Video
+from app.models.program import ProgramDay
 
 
 def get_dashboard_metrics(db: Session) -> dict:
@@ -10,9 +11,19 @@ def get_dashboard_metrics(db: Session) -> dict:
     active_users = db.query(func.count(User.id)).filter(User.is_active == True).scalar() or 0
     inactive_users = total_users - active_users
 
-    total_videos = db.query(func.count(Video.id)).scalar() or 0
+    plan_video_subquery = (
+        db.query(ProgramDay.video_id)
+        .filter(ProgramDay.video_id.isnot(None))
+        .subquery()
+    )
+
+    def _videos_query():
+        return db.query(Video).filter(~Video.id.in_(plan_video_subquery))
+
+    total_videos = _videos_query().with_entities(func.count(Video.id)).scalar() or 0
     videos_by_body_part = (
-        db.query(Video.body_part, func.count(Video.id))
+        _videos_query()
+        .with_entities(Video.body_part, func.count(Video.id))
         .group_by(Video.body_part)
         .all()
     )
@@ -22,7 +33,8 @@ def get_dashboard_metrics(db: Session) -> dict:
     ]
 
     videos_by_gender = (
-        db.query(Video.gender, func.count(Video.id))
+        _videos_query()
+        .with_entities(Video.gender, func.count(Video.id))
         .group_by(Video.gender)
         .all()
     )
@@ -32,7 +44,8 @@ def get_dashboard_metrics(db: Session) -> dict:
     ]
 
     videos_by_category_gender = (
-        db.query(Video.body_part, Video.gender, func.count(Video.id))
+        _videos_query()
+        .with_entities(Video.body_part, Video.gender, func.count(Video.id))
         .group_by(Video.body_part, Video.gender)
         .all()
     )

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.video import Video
+from app.models.program import ProgramDay
 from app.schemas.video import (
     VideoResponse,
     BodyPartEnum,
@@ -77,7 +78,17 @@ def fetch_db_videos(
         if not requesting_all and not normalized:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid category")
 
-        base_query = db.query(Video).order_by(Video.created_at.desc())
+        plan_video_subquery = (
+            db.query(ProgramDay.video_id)
+            .filter(ProgramDay.video_id.isnot(None))
+            .subquery()
+        )
+
+        base_query = (
+            db.query(Video)
+                .filter(~Video.id.in_(plan_video_subquery))
+                .order_by(Video.created_at.desc())
+        )
         if normalized:
             db_values = _db_values_for_category(normalized)
             base_query = base_query.filter(Video.body_part.in_(db_values))

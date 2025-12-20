@@ -149,8 +149,8 @@ def upload_video(
         new_video = Video(
             title=payload.title,
             description=payload.description,
-            body_part=payload.body_part.value,
-            gender=payload.gender.value,
+            body_part=(payload.body_part or ""),
+            gender=(payload.gender or ""),
             video_url=str(payload.video_url),
             thumbnail_url=str(payload.thumbnail_url),
         )
@@ -180,10 +180,10 @@ def update_video(
         if not video:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
 
-        if payload.body_part:
-            video.body_part = payload.body_part.value
-        if payload.gender:
-            video.gender = payload.gender.value
+        if payload.body_part is not None:
+            video.body_part = payload.body_part
+        if payload.gender is not None:
+            video.gender = payload.gender
         if payload.title is not None:
             video.title = payload.title
         if payload.description is not None:

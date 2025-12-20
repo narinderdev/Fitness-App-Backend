@@ -68,6 +68,27 @@ def _ensure_unique_program_slug(
         counter += 1
 
 
+def _collect_video_ids(db: Session, program_id: int) -> List[int]:
+    rows = (
+        db.query(ProgramDay.video_id)
+        .filter(ProgramDay.program_id == program_id, ProgramDay.video_id.isnot(None))
+        .all()
+    )
+    return [row[0] for row in rows if row[0]]
+
+
+def _videos_still_referenced(db: Session, video_ids: List[int]) -> set[int]:
+    if not video_ids:
+        return set()
+    rows = (
+        db.query(ProgramDay.video_id)
+        .filter(ProgramDay.video_id.in_(video_ids))
+        .distinct()
+        .all()
+    )
+    return {row[0] for row in rows if row[0]}
+
+
 def _program_payload(program: Program, preview_days: Iterable[ProgramDay] | None = None) -> dict:
     access = _access_enum(program.access_level)
     preview = [
@@ -388,7 +409,16 @@ def delete_program(program_identifier: str, db: Session = Depends(get_db), admin
     del admin
     try:
         program = _program_by_identifier(db, program_identifier)
+        video_ids = _collect_video_ids(db, program.id)
         db.delete(program)
+        db.flush()
+        removable_videos = set(video_ids) - _videos_still_referenced(db, video_ids)
+        if removable_videos:
+            (
+                db.query(Video)
+                .filter(Video.id.in_(removable_videos))
+                .delete(synchronize_session=False)
+            )
         db.commit()
         return create_response(message="Program deleted", data={"deleted": True})
     except HTTPException:

@@ -1,6 +1,6 @@
 from enum import Enum
 from datetime import datetime
-from pydantic import BaseModel, AnyHttpUrl
+from pydantic import BaseModel, AnyHttpUrl, field_validator
 
 
 class GenderEnum(str, Enum):
@@ -20,21 +20,61 @@ class BodyPartEnum(str, Enum):
 
 
 class VideoCreateRequest(BaseModel):
-    body_part: BodyPartEnum
-    gender: GenderEnum
+    body_part: str | None = None
+    gender: str | None = None
     title: str | None = None
     description: str | None = None
     video_url: AnyHttpUrl
     thumbnail_url: AnyHttpUrl
 
+    @field_validator("body_part")
+    @classmethod
+    def validate_body_part(cls, value: str | None) -> str:
+        if value in (None, ""):
+            return ""
+        allowed = {item.value for item in BodyPartEnum}
+        if value not in allowed:
+            raise ValueError("Input should be 'Core', 'Arms', 'FullBody', 'Legs', 'FullBodyStrength' or 'SportNutrition'")
+        return value
+
+    @field_validator("gender")
+    @classmethod
+    def validate_gender(cls, value: str | None) -> str:
+        if value in (None, ""):
+            return ""
+        allowed = {item.value for item in GenderEnum}
+        if value not in allowed:
+            raise ValueError("Input should be 'Male', 'Female', 'Both' or 'All'")
+        return value
+
 
 class VideoUpdateRequest(BaseModel):
-    body_part: BodyPartEnum | None = None
-    gender: GenderEnum | None = None
+    body_part: str | None = None
+    gender: str | None = None
     title: str | None = None
     description: str | None = None
     video_url: AnyHttpUrl | None = None
     thumbnail_url: AnyHttpUrl | None = None
+
+    @field_validator("body_part")
+    @classmethod
+    def validate_body_part(cls, value: str | None) -> str | None:
+        if value in (None, ""):
+            return "" if value == "" else None
+        allowed = {item.value for item in BodyPartEnum}
+        if value not in allowed:
+            raise ValueError("Input should be 'Core', 'Arms', 'FullBody', 'Legs', 'FullBodyStrength' or 'SportNutrition'")
+        return value
+
+    @field_validator("gender")
+    @classmethod
+    def validate_gender(cls, value: str | None) -> str | None:
+        if value in (None, ""):
+            return "" if value == "" else None
+        allowed = {item.value for item in GenderEnum}
+        if value not in allowed:
+            raise ValueError("Input should be 'Male', 'Female', 'Both' or 'All'")
+        return value
 
 
 class VideoResponse(BaseModel):

@@ -300,53 +300,7 @@ def _build_days(program: Program, template: list[dict]):
 
 
 def seed_programs(db):
-    programs_to_seed = [
-        {
-            "slug": "28-day-free-plan",
-            "title": "28-Day Free Plan",
-            "subtitle": "Five guided workouts plus intentional rest each week.",
-            "description": "A structured month-long routine that builds consistency without needing equipment.",
-            "duration_days": 28,
-            "workouts_per_week": 5,
-            "rest_days_per_week": 2,
-            "level": "Beginner",
-            "access_level": "free",
-            "cta_label": "Join for Free",
-            "hero_image_url": None,
-            "cover_image_url": None,
-            "is_active": True,
-            "is_featured": True,
-            "template": FREE_WEEK_TEMPLATE,
-        },
-        {
-            "slug": "60-day-premium-plan",
-            "title": "60-Day Premium Plan",
-            "subtitle": "Expanded coaching, more progressive overload, and deeper recovery.",
-            "description": "A comprehensive two-month roadmap that extends the free plan progression for premium members.",
-            "duration_days": 60,
-            "workouts_per_week": 5,
-            "rest_days_per_week": 2,
-            "level": "Intermediate",
-            "access_level": "paid",
-            "cta_label": "Unlock with Premium",
-            "hero_image_url": None,
-            "cover_image_url": None,
-            "is_active": True,
-            "is_featured": False,
-            "template": PREMIUM_WEEK_TEMPLATE,
-        },
-    ]
-
-    for config in programs_to_seed:
-        existing = db.query(Program).filter(Program.slug == config["slug"]).first()
-        if existing:
-            continue
-        template = config.pop("template")
-        program = Program(**config)
-        db.add(program)
-        db.flush()
-        db.bulk_save_objects(_build_days(program, template))
-        print(f"✔ Seeded program '{program.title}' with {program.duration_days} days")
+    return
 
 
 def seed_food_catalog(db):

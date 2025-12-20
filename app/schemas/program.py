@@ -98,6 +98,8 @@ class ProgramDayResponse(ProgramDayBase):
     created_at: datetime
     updated_at: datetime
     video: ProgramVideoSnippet | None = None
+    is_completed: bool = False
+    completed_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 
@@ -123,3 +125,20 @@ class ProgramDetailResponse(BaseModel):
     program: ProgramResponse
     days: List[ProgramDayResponse]
     timeline: ProgramTimeline
+    available_day: int | None = None
+
+
+class ProgramScheduleDay(BaseModel):
+    day_number: int = Field(..., gt=0)
+    is_rest_day: bool = False
+    title: str | None = None
+    focus: str | None = Field(None, max_length=100)
+    description: str | None = None
+    workout_summary: str | None = None
+    duration_minutes: int | None = Field(None, gt=0)
+    video_id: int | None = Field(None, gt=0)
+    tips: str | None = None
+
+
+class ProgramScheduleUpdate(BaseModel):
+    days: List[ProgramScheduleDay]

@@ -1,11 +1,12 @@
 from collections import defaultdict
+from datetime import date, datetime
 from typing import Dict, Iterable, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.models.program import Program, ProgramDay
+from app.models.program import Program, ProgramDay, ProgramDayProgress, ProgramEnrollment
 from app.models.video import Video
 from app.schemas.program import (
     ProgramCreate,
@@ -15,6 +16,7 @@ from app.schemas.program import (
     ProgramDayPreview,
     ProgramDetailResponse,
     ProgramResponse,
+    ProgramScheduleUpdate,
     ProgramTimeline,
     ProgramUpdate,
     ProgramVisibility,
@@ -73,7 +75,7 @@ def _program_payload(program: Program, preview_days: Iterable[ProgramDay] | None
     return payload
 
 
-def _day_payload(day: ProgramDay) -> dict:
+def _day_payload(day: ProgramDay, completed_at: datetime | None = None) -> dict:
     video_snippet = None
     if day.video_id:
         video_snippet = ProgramVideoSnippet(
@@ -97,6 +99,8 @@ def _day_payload(day: ProgramDay) -> dict:
         created_at=day.created_at,
         updated_at=day.updated_at,
         video=video_snippet,
+        is_completed=completed_at is not None,
+        completed_at=completed_at,
     ).model_dump()
     return payload
 
@@ -126,6 +130,57 @@ def _fetch_preview_days(db: Session, program_ids: List[int]) -> Dict[int, List[P
         if len(bucket) < PREVIEW_LIMIT:
             bucket.append(day)
     return mapping
+
+
+def _day_completion_map(db: Session, user_id: int, day_ids: List[int]) -> Dict[int, datetime]:
+    if not day_ids:
+        return {}
+    rows = (
+        db.query(ProgramDayProgress)
+        .filter(
+            ProgramDayProgress.user_id == user_id,
+            ProgramDayProgress.program_day_id.in_(day_ids),
+        )
+        .all()
+    )
+    return {row.program_day_id: row.completed_at for row in rows}
+
+
+def _get_or_create_enrollment(db: Session, user_id: int, program_id: int) -> ProgramEnrollment:
+    enrollment = (
+        db.query(ProgramEnrollment)
+        .filter(
+            ProgramEnrollment.user_id == user_id,
+            ProgramEnrollment.program_id == program_id,
+        )
+        .first()
+    )
+    if enrollment:
+        return enrollment
+    enrollment = ProgramEnrollment(
+        user_id=user_id,
+        program_id=program_id,
+        start_date=date.today(),
+    )
+    db.add(enrollment)
+    db.commit()
+    db.refresh(enrollment)
+    return enrollment
+
+
+def _max_day_number(program: Program, days: List[ProgramDay]) -> int:
+    if program.duration_days:
+        return program.duration_days
+    return max((day.day_number for day in days), default=0)
+
+
+def _available_day_for_user(max_day: int, enrollment: ProgramEnrollment) -> int:
+    today = date.today()
+    elapsed = max((today - enrollment.start_date).days, 0)
+    allowed = elapsed + 1
+    if max_day:
+        allowed = min(allowed, max_day)
+    return max(allowed, 1)
 
 
 def _program_by_identifier(db: Session, identifier: str) -> Program:
@@ -240,7 +295,7 @@ def create_program(
         slug = _normalize_slug(body.slug)
         existing = db.query(Program).filter(Program.slug == slug).first()
         if existing:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Slug already in use.")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Plan already added.")
         program = Program(
             slug=slug,
             title=body.title.strip(),
@@ -291,7 +346,7 @@ def update_program(
                 .first()
             )
             if duplicate:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Slug already in use.")
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Plan already added.")
             update_data["slug"] = slug
         for field, value in update_data.items():
             if hasattr(program, field):
@@ -421,9 +476,13 @@ def delete_program_day(
         return handle_exception(exc)
 
 
-@router.get("/{program_identifier}")
-def get_program_detail(program_identifier: str, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    del user
+@router.get("/admin/{program_identifier}")
+def admin_program_detail(
+    program_identifier: str,
+    db: Session = Depends(get_db),
+    admin=Depends(get_current_admin),
+):
+    del admin
     try:
         program = _program_by_identifier(db, program_identifier)
         days = (
@@ -440,6 +499,180 @@ def get_program_detail(program_identifier: str, db: Session = Depends(get_db), u
             timeline=_timeline_payload(days),
         ).model_dump()
         return create_response(message="Program fetched", data=payload)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        return handle_exception(exc)
+
+
+@router.get("/{program_identifier}")
+def get_program_detail(program_identifier: str, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    try:
+        program = _program_by_identifier(db, program_identifier)
+        days = (
+            db.query(ProgramDay)
+            .options(joinedload(ProgramDay.video))
+            .filter(ProgramDay.program_id == program.id)
+            .order_by(ProgramDay.day_number.asc())
+            .all()
+        )
+        preview = days[:PREVIEW_LIMIT]
+        enrollment = _get_or_create_enrollment(db, user.id, program.id)
+        max_day_number = _max_day_number(program, days)
+        available_day = _available_day_for_user(max_day_number, enrollment)
+        progress = _day_completion_map(db, user.id, [day.id for day in days])
+        payload = ProgramDetailResponse(
+            program=_program_payload(program, preview),
+            days=[_day_payload(day, progress.get(day.id)) for day in days],
+            timeline=_timeline_payload(days),
+            available_day=available_day,
+        ).model_dump()
+        return create_response(message="Program fetched", data=payload)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        return handle_exception(exc)
+
+
+@router.post("/{program_identifier}/days/{day_id}/complete")
+def mark_program_day_complete(
+    program_identifier: str,
+    day_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    try:
+        program = _program_by_identifier(db, program_identifier)
+        day = (
+            db.query(ProgramDay)
+            .filter(ProgramDay.id == day_id, ProgramDay.program_id == program.id)
+            .first()
+        )
+        if not day:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Day not found.")
+        enrollment = _get_or_create_enrollment(db, user.id, program.id)
+        available_day = _available_day_for_user(_max_day_number(program, [day]), enrollment)
+        if day.day_number > available_day:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="This workout is locked until its scheduled day.",
+            )
+        progress = (
+            db.query(ProgramDayProgress)
+            .filter(
+                ProgramDayProgress.user_id == user.id,
+                ProgramDayProgress.program_day_id == day.id,
+            )
+            .first()
+        )
+        now = datetime.utcnow()
+        if progress:
+            progress.completed_at = now
+        else:
+            progress = ProgramDayProgress(
+                user_id=user.id,
+                program_day_id=day.id,
+                completed_at=now,
+            )
+            db.add(progress)
+        db.commit()
+        db.refresh(progress)
+        payload = {
+            "program_day_id": day.id,
+            "completed_at": progress.completed_at.isoformat() if progress.completed_at else None,
+        }
+        return create_response(message="Workout marked as complete", data=payload)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        return handle_exception(exc)
+
+
+@router.put("/admin/{program_identifier}/schedule")
+def replace_program_schedule(
+    program_identifier: str,
+    body: ProgramScheduleUpdate,
+    db: Session = Depends(get_db),
+    admin=Depends(get_current_admin),
+):
+    del admin
+    try:
+        program = _program_by_identifier(db, program_identifier)
+        if not body.days:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="At least one day is required.")
+        normalized: List[dict] = []
+        seen_numbers: set[int] = set()
+        max_days = program.duration_days or 0
+        for entry in body.days:
+            if entry.day_number in seen_numbers:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Duplicate entry for day {entry.day_number}.",
+                )
+            if max_days and entry.day_number > max_days:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Day {entry.day_number} exceeds the program duration of {max_days} days.",
+                )
+            seen_numbers.add(entry.day_number)
+            title = (entry.title or ("Rest Day" if entry.is_rest_day else f"Day {entry.day_number}")).strip()
+            if not title:
+                title = f"Day {entry.day_number}"
+            video_id = None
+            if not entry.is_rest_day:
+                if not entry.video_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Day {entry.day_number} requires a video.",
+                    )
+                _validate_video(db, entry.video_id)
+                video_id = entry.video_id
+            normalized.append(
+                {
+                    "day_number": entry.day_number,
+                    "title": title,
+                    "focus": entry.focus,
+                    "description": entry.description,
+                    "is_rest_day": entry.is_rest_day,
+                    "workout_summary": entry.workout_summary,
+                    "duration_minutes": entry.duration_minutes,
+                    "video_id": video_id,
+                    "tips": entry.tips,
+                }
+            )
+        existing_days = (
+            db.query(ProgramDay)
+            .options(joinedload(ProgramDay.video))
+            .filter(ProgramDay.program_id == program.id)
+            .all()
+        )
+        existing_by_number = {day.day_number: day for day in existing_days}
+        provided_numbers = {item["day_number"] for item in normalized}
+        for item in normalized:
+            current = existing_by_number.get(item["day_number"])
+            if current:
+                for field, value in item.items():
+                    setattr(current, field, value)
+            else:
+                db.add(ProgramDay(program_id=program.id, **item))
+        for day in existing_days:
+            if day.day_number not in provided_numbers:
+                db.delete(day)
+        db.commit()
+        refreshed = (
+            db.query(ProgramDay)
+            .options(joinedload(ProgramDay.video))
+            .filter(ProgramDay.program_id == program.id)
+            .order_by(ProgramDay.day_number.asc())
+            .all()
+        )
+        preview = refreshed[:PREVIEW_LIMIT]
+        payload = ProgramDetailResponse(
+            program=_program_payload(program, preview),
+            days=[_day_payload(day) for day in refreshed],
+            timeline=_timeline_payload(refreshed),
+        ).model_dump()
+        return create_response(message="Program schedule updated", data=payload)
     except HTTPException:
         raise
     except Exception as exc:

@@ -3,6 +3,7 @@ from datetime import datetime
 from sqlalchemy import (
     Boolean,
     Column,
+    Date,
     DateTime,
     ForeignKey,
     Integer,
@@ -42,6 +43,11 @@ class Program(Base):
         cascade="all, delete-orphan",
         order_by="ProgramDay.day_number",
     )
+    enrollments = relationship(
+        "ProgramEnrollment",
+        back_populates="program",
+        cascade="all, delete-orphan",
+    )
 
 
 class ProgramDay(Base):
@@ -66,3 +72,36 @@ class ProgramDay(Base):
 
     program = relationship("Program", back_populates="days")
     video = relationship("Video", lazy="joined")
+
+
+class ProgramDayProgress(Base):
+    __tablename__ = "program_day_progress"
+    __table_args__ = (
+        UniqueConstraint("user_id", "program_day_id", name="uq_user_program_day"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    program_day_id = Column(
+        Integer,
+        ForeignKey("program_days.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    completed_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class ProgramEnrollment(Base):
+    __tablename__ = "program_enrollments"
+    __table_args__ = (
+        UniqueConstraint("user_id", "program_id", name="uq_user_program_enrollment"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    program_id = Column(Integer, ForeignKey("programs.id", ondelete="CASCADE"), nullable=False, index=True)
+    start_date = Column(Date, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    program = relationship("Program", back_populates="enrollments")

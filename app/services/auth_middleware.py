@@ -14,8 +14,11 @@ def _get_auth_context(token: str, db: Session):
         payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.ALGORITHM])
         email = payload.get("sub")
         jti = payload.get("jti")
+        token_type = payload.get("type") or "access"
         if not email or not jti:
             raise HTTPException(status_code=401, detail="Invalid token payload")
+        if token_type != "access":
+            raise HTTPException(status_code=401, detail="Invalid token type")
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 

@@ -2,18 +2,21 @@ from datetime import datetime
 import random
 import uuid
 
+from jose import jwt, JWTError
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.user import User
 from app.models.user_session import UserSession
-from app.schemas.user import RequestOtp, VerifyOtp, PlatformEnum
+from app.schemas.user import RequestOtp, VerifyOtp, RefreshTokenRequest, PlatformEnum
 from app.services.gmail_oauth_service import send_email_otp
-from app.services.auth_service import create_access_token
+from app.services.auth_service import create_access_token, create_refresh_token
 from app.services.auth_middleware import get_current_session
 from app.services.questionnaire_service import count_pending_required_questions
 from app.utils.response import create_response, handle_exception
+from app.config import settings
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -156,6 +159,7 @@ def verify_otp(body: VerifyOtp, db: Session = Depends(get_db)):
         user.otp = None
         jti = str(uuid.uuid4())
         token = create_access_token({"sub": user.email, "jti": jti})
+        refresh_token = create_refresh_token({"sub": user.email, "jti": jti})
 
         session_record = UserSession(user_id=user.id, jti=jti, token=token)
         db.add(session_record)
@@ -171,11 +175,80 @@ def verify_otp(body: VerifyOtp, db: Session = Depends(get_db)):
             data={
                 "access_token": token,
                 "token_type": "bearer",
+                "refresh_token": refresh_token,
                 "profile_complete": profile_complete,
                 "pending_question_count": pending_question_count,
                 "has_pending_questions": pending_question_count > 0,
             },
             status_code=status.HTTP_200_OK
+        )
+    except Exception as exc:
+        return handle_exception(exc)
+
+
+@router.post("/refresh")
+def refresh_access_token(body: RefreshTokenRequest, db: Session = Depends(get_db)):
+    try:
+        try:
+            payload = jwt.decode(
+                body.refresh_token,
+                settings.JWT_SECRET,
+                algorithms=[settings.ALGORITHM],
+            )
+        except JWTError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired refresh token",
+            )
+        token_type = payload.get("type")
+        if token_type != "refresh":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid refresh token",
+            )
+
+        email = payload.get("sub")
+        jti = payload.get("jti")
+        if not email or not jti:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token payload",
+            )
+
+        session = db.query(UserSession).filter(
+            UserSession.jti == jti,
+            UserSession.is_active == True,
+        ).first()
+
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Session expired or logged out",
+            )
+
+        user = db.query(User).filter(
+            User.email == email,
+            User.is_active == True,
+        ).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found or inactive",
+            )
+
+        access_token = create_access_token({"sub": user.email, "jti": jti})
+        new_refresh_token = create_refresh_token({"sub": user.email, "jti": jti})
+        session.token = access_token
+        db.commit()
+
+        return create_response(
+            message="Token refreshed",
+            data={
+                "access_token": access_token,
+                "refresh_token": new_refresh_token,
+                "token_type": "bearer",
+            },
+            status_code=status.HTTP_200_OK,
         )
     except Exception as exc:
         return handle_exception(exc)

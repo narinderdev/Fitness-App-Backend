@@ -17,6 +17,7 @@ from app.routers import (
     questions,
     subscription_plans,
     users,
+    exercise_library,
     videos,
     water,
     weight,
@@ -68,6 +69,7 @@ app.include_router(weight.router)
 app.include_router(analytics.router)
 app.include_router(subscription_plans.router)
 app.include_router(programs.router)
+app.include_router(exercise_library.router)
 
 # Serve uploaded assets
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")

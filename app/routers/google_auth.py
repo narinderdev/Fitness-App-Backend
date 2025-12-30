@@ -4,7 +4,7 @@ from app.services.google_auth_service import google_oauth
 from app.database import get_db
 from app.models.user import User
 from app.models.user_session import UserSession
-from app.services.auth_service import create_access_token
+from app.services.auth_service import create_access_token, create_refresh_token
 import uuid
 import os
 
@@ -49,6 +49,7 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
         # ---- generate JWT ----
         jti = str(uuid.uuid4())
         token = create_access_token({"sub": user.email, "jti": jti})
+        refresh_token = create_refresh_token({"sub": user.email, "jti": jti})
 
         # ---- user session ----
         session_record = (
@@ -74,6 +75,7 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
         return {
             "message": "Google login success",
             "access_token": token,
+            "refresh_token": refresh_token,
             "token_type": "bearer",
             "profile_complete": profile_complete,
             "user": {

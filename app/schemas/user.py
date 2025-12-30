@@ -21,6 +21,10 @@ class VerifyOtp(BaseModel):
     is_admin: bool = False
     platform: PlatformEnum = PlatformEnum.app
 
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
 class ProfileUpdate(BaseModel):
     first_name: str | None = None
     last_name: str | None = None

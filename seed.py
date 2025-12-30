@@ -6,6 +6,7 @@ from app.database import Base, engine, SessionLocal
 from app.models.user import User
 from app.models.program import Program, ProgramDay
 from app.models.nutrition import FoodCategory, FoodItem, FoodLog
+from app.models.exercise_library import ExerciseLibraryItem
 
 FREE_WEEK_TEMPLATE = [
     {
@@ -117,6 +118,13 @@ DEFAULT_FOOD_CATEGORIES = [
     {"name": "Proteins", "slug": "proteins", "description": "Lean protein sources.", "sort_order": 3},
     {"name": "Grains", "slug": "grains", "description": "Whole grains and carbs.", "sort_order": 4},
     {"name": "Snacks", "slug": "snacks", "description": "Quick bites.", "sort_order": 5},
+]
+
+DEFAULT_EXERCISE_LIBRARY_ITEMS = [
+    {"slug": "Core", "title": "Core", "sort_order": 1},
+    {"slug": "Arms", "title": "Arm", "sort_order": 2},
+    {"slug": "Legs", "title": "Legs", "sort_order": 3},
+    {"slug": "FullBody", "title": "Full Body", "sort_order": 4},
 ]
 
 DEFAULT_FOODS = [
@@ -380,6 +388,27 @@ def seed_food_catalog(db):
     db.commit()
 
 
+def seed_exercise_library(db):
+    for config in DEFAULT_EXERCISE_LIBRARY_ITEMS:
+        slug = config["slug"]
+        existing = (
+            db.query(ExerciseLibraryItem)
+            .filter(func.lower(ExerciseLibraryItem.slug) == slug.lower())
+            .first()
+        )
+        if existing:
+            continue
+        item = ExerciseLibraryItem(
+            slug=slug,
+            title=config["title"],
+            sort_order=config.get("sort_order", 0),
+            is_active=True,
+        )
+        db.add(item)
+        print(f"✔ Seeded exercise library item '{item.title}'")
+    db.commit()
+
+
 def run_seed():
     db = SessionLocal()
     try:
@@ -412,6 +441,7 @@ def run_seed():
 
         seed_programs(db)
         seed_food_catalog(db)
+        seed_exercise_library(db)
         _backfill_manual_log_macros(db)
         db.commit()
     except Exception as e:

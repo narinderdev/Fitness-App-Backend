@@ -7,6 +7,7 @@ from app.models.user import User
 from app.models.program import Program, ProgramDay
 from app.models.nutrition import FoodCategory, FoodItem, FoodLog
 from app.models.exercise_library import ExerciseLibraryItem
+from app.models.question import Question, AnswerOption
 
 FREE_WEEK_TEMPLATE = [
     {
@@ -125,6 +126,39 @@ DEFAULT_EXERCISE_LIBRARY_ITEMS = [
     {"slug": "Arms", "title": "Arm", "sort_order": 2},
     {"slug": "Legs", "title": "Legs", "sort_order": 3},
     {"slug": "FullBody", "title": "Full Body", "sort_order": 4},
+]
+
+DEFAULT_GOAL_QUESTIONS = [
+    {
+        "question": "What is your current weight?",
+        "description": "Enter your current weight.",
+        "answer_type": "weight",
+        "is_required": True,
+        "options": [
+            {"option_text": "kg", "value": "kg"},
+            {"option_text": "lb", "value": "lb"},
+        ],
+    },
+    {
+        "question": "What is your goal weight?",
+        "description": "Enter the weight you want to reach.",
+        "answer_type": "number",
+        "is_required": True,
+        "options": [
+            {"option_text": "kg", "value": "kg"},
+            {"option_text": "lb", "value": "lb"},
+        ],
+    },
+    {
+        "question": "How long do you want to reach your goal?",
+        "description": "Enter the number of weeks or months.",
+        "answer_type": "number",
+        "is_required": True,
+        "options": [
+            {"option_text": "Weeks", "value": "weeks"},
+            {"option_text": "Months", "value": "months"},
+        ],
+    },
 ]
 
 DEFAULT_FOODS = [
@@ -409,6 +443,56 @@ def seed_exercise_library(db):
     db.commit()
 
 
+def seed_goal_questions(db):
+    for config in DEFAULT_GOAL_QUESTIONS:
+        question_text = config["question"]
+        existing = db.query(Question).filter(Question.question == question_text).first()
+        if existing:
+            question = existing
+            updated = False
+            if question.description != config.get("description"):
+                question.description = config.get("description")
+                updated = True
+            if question.answer_type != config["answer_type"]:
+                question.answer_type = config["answer_type"]
+                updated = True
+            if question.is_required != config.get("is_required", False):
+                question.is_required = config.get("is_required", False)
+                updated = True
+            if updated:
+                db.flush()
+        else:
+            question = Question(
+                question=question_text,
+                description=config.get("description"),
+                answer_type=config["answer_type"],
+                gender=None,
+                is_required=config.get("is_required", False),
+                is_active=True,
+            )
+            db.add(question)
+            db.flush()
+            print(f"✔ Seeded goal question '{question.question}'")
+
+        options = config.get("options") or []
+        if options:
+            existing_options = {opt.option_text.lower(): opt for opt in question.options}
+            for option in options:
+                option_text = option["option_text"].strip()
+                if option_text.lower() in existing_options:
+                    continue
+                db.add(
+                    AnswerOption(
+                        question_id=question.id,
+                        option_text=option_text,
+                        value=option.get("value"),
+                        is_active=True,
+                    )
+                )
+            db.flush()
+    db.commit()
+
+
 def run_seed():
     db = SessionLocal()
     try:
@@ -442,6 +526,7 @@ def run_seed():
         seed_programs(db)
         seed_food_catalog(db)
         seed_exercise_library(db)
+        seed_goal_questions(db)
         _backfill_manual_log_macros(db)
         db.commit()
     except Exception as e:

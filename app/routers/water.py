@@ -153,6 +153,38 @@ def register_device_token(
         return handle_exception(exc)
 
 
+@router.delete("/tokens")
+def unregister_device_token(
+    token: str = Query(..., min_length=1),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        logger.info("User %s removing device token %s", current_user.id, token)
+        token_record = (
+            db.query(DeviceToken)
+            .filter(DeviceToken.user_id == current_user.id, DeviceToken.token == token)
+            .first()
+        )
+        if not token_record:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Device token not found",
+            )
+        db.delete(token_record)
+        db.commit()
+        logger.info("Device token %s removed for user %s", token, current_user.id)
+        return create_response(
+            message="Device token removed",
+            data={"token": token},
+            status_code=status.HTTP_200_OK,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        return handle_exception(exc)
+
+
 @router.post("/reminder")
 def send_water_reminder(
     body: NotificationRequest,

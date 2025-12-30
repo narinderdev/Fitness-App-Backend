@@ -23,6 +23,7 @@ from app.routers import (
     weight,
 )
 from app.utils.response import create_response, handle_exception
+from app.utils.db_migrations import ensure_program_price_column
 from seed import run_seed
 from app.services.water_reminder_service import reminder_scheduler
 
@@ -45,6 +46,7 @@ app.add_middleware(
 # Seed default user on startup
 @app.on_event("startup")
 async def startup_event():
+    ensure_program_price_column(engine)
     run_seed()
     await reminder_scheduler.start()
 

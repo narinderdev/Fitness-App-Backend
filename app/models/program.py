@@ -5,6 +5,7 @@ from sqlalchemy import (
     Column,
     Date,
     DateTime,
+    Float,
     ForeignKey,
     Integer,
     String,
@@ -29,6 +30,7 @@ class Program(Base):
     rest_days_per_week = Column(Integer, nullable=False, default=2)
     level = Column(String(50), nullable=True)
     access_level = Column(String(20), nullable=False, default="free")
+    price_usd = Column(Float, nullable=True)
     cta_label = Column(String(120), nullable=True)
     hero_image_url = Column(String, nullable=True)
     cover_image_url = Column(String, nullable=True)

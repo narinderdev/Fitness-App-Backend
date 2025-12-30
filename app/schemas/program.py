@@ -22,6 +22,7 @@ class ProgramBase(BaseModel):
     rest_days_per_week: int = Field(2, ge=0, le=7)
     level: str | None = Field(None, max_length=50)
     access_level: ProgramVisibility = ProgramVisibility.free
+    price_usd: float | None = Field(None, ge=0)
     cta_label: str | None = Field(None, max_length=120)
     hero_image_url: str | None = None
     cover_image_url: str | None = None
@@ -43,6 +44,7 @@ class ProgramUpdate(BaseModel):
     rest_days_per_week: int | None = Field(None, ge=0, le=7)
     level: str | None = Field(None, max_length=50)
     access_level: ProgramVisibility | None = None
+    price_usd: float | None = Field(None, ge=0)
     cta_label: str | None = Field(None, max_length=120)
     hero_image_url: str | None = None
     cover_image_url: str | None = None

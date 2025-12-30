@@ -26,6 +26,7 @@ from app.utils.response import create_response, handle_exception
 from app.utils.db_migrations import ensure_program_price_column
 from seed import run_seed
 from app.services.water_reminder_service import reminder_scheduler
+from app.services.progress_reminder_service import progress_reminder_scheduler
 
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key=settings.JWT_SECRET)
@@ -49,11 +50,13 @@ async def startup_event():
     ensure_program_price_column(engine)
     run_seed()
     await reminder_scheduler.start()
+    await progress_reminder_scheduler.start()
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
     await reminder_scheduler.stop()
+    await progress_reminder_scheduler.stop()
 
 # Add routes
 app.include_router(auth.router)

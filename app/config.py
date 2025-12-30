@@ -23,6 +23,13 @@ class Settings:
     WATER_REMINDER_AUTO_ENABLED = os.getenv("WATER_REMINDER_AUTO_ENABLED", "true").lower() == "true"
     WATER_REMINDER_TITLE = os.getenv("WATER_REMINDER_TITLE", "Drink water")
     WATER_REMINDER_BODY = os.getenv("WATER_REMINDER_BODY", "Time to hydrate!")
+    PROGRESS_REMINDER_INTERVAL_MINUTES = int(os.getenv("PROGRESS_REMINDER_INTERVAL_MINUTES", 1))
+    PROGRESS_REMINDER_AUTO_ENABLED = os.getenv("PROGRESS_REMINDER_AUTO_ENABLED", "true").lower() == "true"
+    PROGRESS_REMINDER_TITLE = os.getenv("PROGRESS_REMINDER_TITLE", "Progress update")
+    PROGRESS_REMINDER_BODY = os.getenv(
+        "PROGRESS_REMINDER_BODY",
+        "You have {remaining} calories left to reach today's goal.",
+    )
 
     bearer_scheme = HTTPBearer()
     cors_origins = [

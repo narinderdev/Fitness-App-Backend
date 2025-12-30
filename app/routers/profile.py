@@ -11,6 +11,7 @@ from app.models.user_session import UserSession
 from app.models.water import DeviceToken, WaterLog
 from app.schemas.user import ProfileResponse, ProfileUpdate
 from app.services.auth_middleware import get_current_user
+from app.services.bmi_service import recalculate_user_bmi
 from app.utils.response import create_response, handle_exception
 
 router = APIRouter(prefix="/profile", tags=["Profile"])
@@ -27,6 +28,12 @@ def get_profile(
         user = db.query(User).filter(User.id == current_user.id).first()
         if not user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+        if user.bmi_value is None or user.bmi_value <= 0:
+            bmi_payload = recalculate_user_bmi(db, user)
+            if bmi_payload is not None:
+                db.commit()
+                db.refresh(user)
 
         profile_payload = ProfileResponse.model_validate(user).model_dump()
         return create_response(

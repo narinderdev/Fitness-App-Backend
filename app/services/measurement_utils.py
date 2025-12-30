@@ -13,7 +13,7 @@ _WEIGHT_UNIT_ALIASES = {
 }
 
 _HEIGHT_UNIT_ALIASES = {
-    "cm": {"cm", "centimeter", "centimeters"},
+    "cm": {"cm", "cms", "centimeter", "centimeters"},
     "m": {"m", "meter", "meters"},
     "ft": {"ft", "foot", "feet"},
     "in": {"in", "inch", "inches"},

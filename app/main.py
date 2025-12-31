@@ -23,7 +23,7 @@ from app.routers import (
     weight,
 )
 from app.utils.response import create_response, handle_exception
-from app.utils.db_migrations import ensure_program_price_column
+from app.utils.db_migrations import ensure_program_price_column, drop_food_category_slug_and_sort
 from seed import run_seed
 from app.services.water_reminder_service import reminder_scheduler
 from app.services.progress_reminder_service import progress_reminder_scheduler
@@ -48,6 +48,7 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup_event():
     ensure_program_price_column(engine)
+    drop_food_category_slug_and_sort(engine)
     run_seed()
     await reminder_scheduler.start()
     await progress_reminder_scheduler.start()

@@ -60,9 +60,7 @@ class FoodLogEntry(BaseModel):
 class FoodCategoryResponse(BaseModel):
     id: int
     name: str
-    slug: str
     description: str | None
-    sort_order: int
     is_active: bool
 
     model_config = {"from_attributes": True}
@@ -70,17 +68,13 @@ class FoodCategoryResponse(BaseModel):
 
 class FoodCategoryCreate(BaseModel):
     name: str
-    slug: str | None = None
     description: str | None = None
-    sort_order: int = 0
     is_active: bool = True
 
 
 class FoodCategoryUpdate(BaseModel):
     name: str | None = None
-    slug: str | None = None
     description: str | None = None
-    sort_order: int | None = None
     is_active: bool | None = None
 
 

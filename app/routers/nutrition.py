@@ -71,26 +71,6 @@ def _log_payload(log: FoodLog) -> dict:
     return payload
 
 
-def _slugify(value: str) -> str:
-    normalized = "".join(ch.lower() if ch.isalnum() else "-" for ch in value.strip())
-    normalized = "-".join(filter(None, normalized.split("-")))
-    return normalized or "category"
-
-
-def _unique_category_slug(db: Session, slug: str, category_id: int | None = None) -> str:
-    base = slug
-    counter = 1
-    while True:
-        query = db.query(FoodCategory).filter(func.lower(FoodCategory.slug) == slug.lower())
-        if category_id:
-            query = query.filter(FoodCategory.id != category_id)
-        exists = query.first()
-        if not exists:
-            return slug
-        slug = f"{base}-{counter}"
-        counter += 1
-
-
 @router.get("/categories")
 def list_categories(
     db: Session = Depends(get_db),
@@ -99,7 +79,7 @@ def list_categories(
         categories = (
             db.query(FoodCategory)
             .filter(FoodCategory.is_active == True)
-            .order_by(FoodCategory.sort_order.asc(), FoodCategory.name.asc())
+            .order_by(FoodCategory.name.asc())
             .all()
         )
         payload = [FoodCategoryResponse.model_validate(cat).model_dump() for cat in categories]
@@ -118,7 +98,7 @@ def admin_list_categories(
     db: Session = Depends(get_db),
 ):
     try:
-        query = db.query(FoodCategory).order_by(FoodCategory.sort_order.asc(), FoodCategory.name.asc())
+        query = db.query(FoodCategory).order_by(FoodCategory.name.asc())
         if not include_inactive:
             query = query.filter(FoodCategory.is_active == True)
         categories = query.all()
@@ -138,13 +118,9 @@ def admin_create_category(
     db: Session = Depends(get_db),
 ):
     try:
-        slug = payload.slug or _slugify(payload.name)
-        slug = _unique_category_slug(db, slug)
         category = FoodCategory(
             name=payload.name.strip(),
-            slug=slug,
             description=payload.description,
-            sort_order=payload.sort_order,
             is_active=payload.is_active,
         )
         db.add(category)
@@ -171,13 +147,8 @@ def admin_update_category(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
         if payload.name is not None:
             category.name = payload.name.strip()
-        if payload.slug is not None:
-            slug = _unique_category_slug(db, payload.slug.strip(), category_id=category.id)
-            category.slug = slug
         if payload.description is not None:
             category.description = payload.description
-        if payload.sort_order is not None:
-            category.sort_order = payload.sort_order
         if payload.is_active is not None:
             category.is_active = payload.is_active
         db.commit()
@@ -202,10 +173,14 @@ def admin_delete_category(
         category = db.query(FoodCategory).filter(FoodCategory.id == category_id).first()
         if not category:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
-        category.is_active = False
+        db.query(FoodItem).filter(FoodItem.category_id == category_id).update(
+            {FoodItem.category_id: None},
+            synchronize_session=False,
+        )
+        db.delete(category)
         db.commit()
         return create_response(
-            message="Category archived",
+            message="Category deleted",
             data={"deleted": True, "category_id": category_id},
             status_code=status.HTTP_200_OK,
         )
@@ -241,7 +216,7 @@ def admin_list_foods(
         total = query.count()
         items = (
             query.order_by(
-                func.coalesce(FoodCategory.sort_order, 0).asc(),
+                func.coalesce(FoodCategory.name, "").asc(),
                 FoodItem.product_name.asc(),
             )
             .offset((page - 1) * page_size)
@@ -348,7 +323,7 @@ def admin_update_food(
 
 
 @admin_router.delete("/foods/{food_id}")
-def admin_archive_food(
+def admin_delete_food(
     food_id: int,
     db: Session = Depends(get_db),
 ):
@@ -356,10 +331,14 @@ def admin_archive_food(
         item = db.query(FoodItem).filter(FoodItem.id == food_id, FoodItem.source == "manual").first()
         if not item:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Food not found")
-        item.is_active = False
+        db.query(FoodLog).filter(FoodLog.food_item_id == food_id).update(
+            {FoodLog.food_item_id: None},
+            synchronize_session=False,
+        )
+        db.delete(item)
         db.commit()
         return create_response(
-            message="Food archived",
+            message="Food deleted",
             data={"deleted": True, "food_id": food_id},
             status_code=status.HTTP_200_OK,
         )
@@ -399,7 +378,7 @@ def list_manual_foods(
         total = query.count()
         items = (
             query.order_by(
-                func.coalesce(FoodCategory.sort_order, 0).asc(),
+                func.coalesce(FoodCategory.name, "").asc(),
                 FoodItem.product_name.asc(),
             )
             .offset((page - 1) * page_size)

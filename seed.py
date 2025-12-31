@@ -114,11 +114,11 @@ PREMIUM_WEEK_TEMPLATE = [
 ]
 
 DEFAULT_FOOD_CATEGORIES = [
-    {"name": "Fruits", "slug": "fruits", "description": "Fresh fruits and berries.", "sort_order": 1},
-    {"name": "Vegetables", "slug": "vegetables", "description": "Leafy greens and veggies.", "sort_order": 2},
-    {"name": "Proteins", "slug": "proteins", "description": "Lean protein sources.", "sort_order": 3},
-    {"name": "Grains", "slug": "grains", "description": "Whole grains and carbs.", "sort_order": 4},
-    {"name": "Snacks", "slug": "snacks", "description": "Quick bites.", "sort_order": 5},
+    {"name": "Fruits", "description": "Fresh fruits and berries."},
+    {"name": "Vegetables", "description": "Leafy greens and veggies."},
+    {"name": "Proteins", "description": "Lean protein sources."},
+    {"name": "Grains", "description": "Whole grains and carbs."},
+    {"name": "Snacks", "description": "Quick bites."},
 ]
 
 DEFAULT_EXERCISE_LIBRARY_ITEMS = [
@@ -164,7 +164,7 @@ DEFAULT_GOAL_QUESTIONS = [
 DEFAULT_FOODS = [
     {
         "name": "Apple",
-        "category_slug": "fruits",
+        "category_name": "Fruits",
         "calories": 95,
         "protein": 0.5,
         "carbs": 25,
@@ -174,7 +174,7 @@ DEFAULT_FOODS = [
     },
     {
         "name": "Banana",
-        "category_slug": "fruits",
+        "category_name": "Fruits",
         "calories": 105,
         "protein": 1.3,
         "carbs": 27,
@@ -184,7 +184,7 @@ DEFAULT_FOODS = [
     },
     {
         "name": "Baby Spinach",
-        "category_slug": "vegetables",
+        "category_name": "Vegetables",
         "calories": 20,
         "protein": 2.0,
         "carbs": 3.4,
@@ -194,7 +194,7 @@ DEFAULT_FOODS = [
     },
     {
         "name": "Grilled Chicken Breast",
-        "category_slug": "proteins",
+        "category_name": "Proteins",
         "calories": 165,
         "protein": 31,
         "carbs": 0,
@@ -204,7 +204,7 @@ DEFAULT_FOODS = [
     },
     {
         "name": "Quinoa (cooked)",
-        "category_slug": "grains",
+        "category_name": "Grains",
         "calories": 222,
         "protein": 8,
         "carbs": 39,
@@ -214,7 +214,7 @@ DEFAULT_FOODS = [
     },
     {
         "name": "Almond Butter",
-        "category_slug": "snacks",
+        "category_name": "Snacks",
         "calories": 98,
         "fat": 9,
         "protein": 3.4,
@@ -346,27 +346,25 @@ def seed_programs(db):
 
 
 def seed_food_catalog(db):
-    slug_to_category = {}
+    name_to_category = {}
     for config in DEFAULT_FOOD_CATEGORIES:
-        slug = config["slug"]
+        name = config["name"]
         existing = (
             db.query(FoodCategory)
-            .filter(func.lower(FoodCategory.slug) == slug.lower())
+            .filter(func.lower(FoodCategory.name) == name.lower())
             .first()
         )
         if existing:
-            slug_to_category[slug] = existing
+            name_to_category[name.lower()] = existing
             continue
         category = FoodCategory(
-            name=config["name"],
-            slug=slug,
+            name=name,
             description=config.get("description"),
-            sort_order=config.get("sort_order", 0),
             is_active=True,
         )
         db.add(category)
         db.flush()
-        slug_to_category[slug] = category
+        name_to_category[name.lower()] = category
         print(f"✔ Seeded food category '{category.name}'")
 
     for entry in DEFAULT_FOODS:
@@ -379,7 +377,8 @@ def seed_food_catalog(db):
             )
             .first()
         )
-        category = slug_to_category.get(entry.get("category_slug"))
+        category_name = (entry.get("category_name") or "").strip().lower()
+        category = name_to_category.get(category_name)
         if existing:
             updated = False
 

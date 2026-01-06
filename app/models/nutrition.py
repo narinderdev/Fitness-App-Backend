@@ -29,6 +29,21 @@ class FoodCategory(Base):
     foods = relationship("FoodItem", back_populates="category")
 
 
+class MealConfig(Base):
+    __tablename__ = "meal_configs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String, nullable=False, unique=True, index=True)
+    name = Column(String, nullable=False)
+    icon_url = Column(String, nullable=True)
+    min_ratio = Column(Float, default=0.0, nullable=False)
+    max_ratio = Column(Float, default=0.0, nullable=False)
+    sort_order = Column(Integer, default=0, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
 class FoodItem(Base):
     __tablename__ = "food_items"
     __table_args__ = (UniqueConstraint("barcode", name="uq_food_barcode"),)
@@ -67,6 +82,7 @@ class FoodLog(Base):
     carbs = Column(Float, nullable=True)
     fat = Column(Float, nullable=True)
     notes = Column(String, nullable=True)
+    meal_type = Column(String, nullable=True, index=True)
     consumed_date = Column(Date, default=date.today, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 

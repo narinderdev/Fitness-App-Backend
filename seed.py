@@ -5,7 +5,7 @@ from sqlalchemy import inspect, text, func
 from app.database import Base, engine, SessionLocal
 from app.models.user import User
 from app.models.program import Program, ProgramDay
-from app.models.nutrition import FoodCategory, FoodItem, FoodLog
+from app.models.nutrition import FoodCategory, FoodItem, FoodLog, MealConfig
 from app.models.exercise_library import ExerciseLibraryItem
 from app.models.question import Question, AnswerOption
 
@@ -126,6 +126,37 @@ DEFAULT_EXERCISE_LIBRARY_ITEMS = [
     {"slug": "Arms", "title": "Arm", "sort_order": 2},
     {"slug": "Legs", "title": "Legs", "sort_order": 3},
     {"slug": "FullBody", "title": "Full Body", "sort_order": 4},
+]
+
+DEFAULT_MEALS = [
+    {
+        "key": "breakfast",
+        "name": "Breakfast",
+        "min_ratio": 0.18,
+        "max_ratio": 0.26,
+        "sort_order": 1,
+    },
+    {
+        "key": "lunch",
+        "name": "Lunch",
+        "min_ratio": 0.22,
+        "max_ratio": 0.30,
+        "sort_order": 2,
+    },
+    {
+        "key": "dinner",
+        "name": "Dinner",
+        "min_ratio": 0.28,
+        "max_ratio": 0.38,
+        "sort_order": 3,
+    },
+    {
+        "key": "snack",
+        "name": "Snack",
+        "min_ratio": 0.06,
+        "max_ratio": 0.08,
+        "sort_order": 4,
+    },
 ]
 
 DEFAULT_GOAL_QUESTIONS = [
@@ -305,6 +336,27 @@ def _ensure_food_schema():
 _ensure_food_schema()
 
 
+def _ensure_meal_schema():
+    inspector = inspect(engine)
+    tables = inspector.get_table_names()
+    if "meal_configs" not in tables:
+        MealConfig.__table__.create(engine)
+        print("✔ Created meal_configs table")
+
+    food_log_columns = {col["name"] for col in inspector.get_columns("food_logs")}
+    statements = []
+    if "meal_type" not in food_log_columns:
+        statements.append("ALTER TABLE food_logs ADD COLUMN meal_type TEXT")
+    with engine.begin() as connection:
+        for statement in statements:
+            connection.execute(text(statement))
+            print(f"✔ Applied migration: {statement}")
+        connection.execute(text("UPDATE food_logs SET meal_type = 'unspecified' WHERE meal_type IS NULL"))
+
+
+_ensure_meal_schema()
+
+
 def _backfill_manual_log_macros(db):
     """Populate missing macro totals for existing manual food logs."""
     logs = (
@@ -469,6 +521,35 @@ def seed_exercise_library(db):
     db.commit()
 
 
+def seed_meals(db):
+    for config in DEFAULT_MEALS:
+        key = config["key"]
+        existing = db.query(MealConfig).filter(func.lower(MealConfig.key) == key.lower()).first()
+        if existing:
+            updated = False
+            for field in ("name", "min_ratio", "max_ratio", "sort_order"):
+                value = config.get(field)
+                if value is None:
+                    continue
+                if getattr(existing, field) != value:
+                    setattr(existing, field, value)
+                    updated = True
+            if updated:
+                print(f"✔ Updated meal config '{existing.key}'")
+            continue
+        meal = MealConfig(
+            key=key,
+            name=config["name"],
+            min_ratio=config.get("min_ratio", 0),
+            max_ratio=config.get("max_ratio", 0),
+            sort_order=config.get("sort_order", 0),
+            is_active=True,
+        )
+        db.add(meal)
+        print(f"✔ Seeded meal '{meal.name}'")
+    db.commit()
+
+
 def seed_goal_questions(db):
     for config in DEFAULT_GOAL_QUESTIONS:
         question_text = config["question"]
@@ -552,6 +633,7 @@ def run_seed():
         seed_programs(db)
         seed_food_catalog(db)
         seed_exercise_library(db)
+        seed_meals(db)
         seed_goal_questions(db)
         _backfill_manual_log_macros(db)
         db.commit()

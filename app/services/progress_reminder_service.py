@@ -104,7 +104,7 @@ class ProgressReminderScheduler:
 
 
 def _build_user_reminder(session, user_id: int) -> tuple[str, str, dict[str, str]] | None:
-    target_payload = _calculate_target_calories(session, user_id)
+    target_payload = calculate_target_calories(session, user_id)
     if not target_payload:
         return None
     target_calories, burned_calories = target_payload
@@ -124,7 +124,7 @@ def _build_user_reminder(session, user_id: int) -> tuple[str, str, dict[str, str
     return title, body, payload
 
 
-def _calculate_target_calories(session, user_id: int) -> tuple[int, int] | None:
+def calculate_target_calories(session, user_id: int) -> tuple[int, int] | None:
     current_weight = _latest_weight_kg(session, user_id)
     answers = _fetch_answers(session, user_id)
     user = session.query(User).filter(User.id == user_id).first()

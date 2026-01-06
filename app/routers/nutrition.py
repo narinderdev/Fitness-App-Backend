@@ -5,7 +5,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models.nutrition import FoodItem, FoodLog, FoodCategory
+from app.models.nutrition import FoodItem, FoodLog, FoodCategory, MealConfig
 from app.models.user import User
 from app.schemas.nutrition import (
     FoodCategoryCreate,
@@ -15,10 +15,15 @@ from app.schemas.nutrition import (
     FoodItemResponse,
     FoodLogEntry,
     LogCreate,
+    LogUpdate,
     ScanRequest,
+    MealConfigCreate,
+    MealConfigResponse,
+    MealConfigUpdate,
 )
 from app.services.auth_middleware import get_current_admin, get_current_user
 from app.services.openfoodfacts import get_or_create_food_item
+from app.services.progress_reminder_service import calculate_target_calories, DEFAULT_BASE_CALORIES
 from app.utils.response import create_response, handle_exception
 import httpx
 
@@ -66,9 +71,38 @@ def _log_payload(log: FoodLog) -> dict:
         carbs=log.carbs,
         fat=log.fat,
         notes=log.notes,
+        meal_type=log.meal_type,
         food_item=item,
     ).model_dump()
     return payload
+
+
+def _daily_goal_calories(db: Session, user_id: int) -> int:
+    target_payload = calculate_target_calories(db, user_id)
+    if not target_payload:
+        return DEFAULT_BASE_CALORIES
+    return target_payload[0]
+
+
+def _meal_payload(meal: MealConfig, daily_goal: int) -> dict:
+    min_ratio = meal.min_ratio or 0
+    max_ratio = meal.max_ratio or 0
+    if max_ratio < min_ratio:
+        max_ratio = min_ratio
+    recommended_min = round(daily_goal * min_ratio) if min_ratio > 0 else 0
+    recommended_max = round(daily_goal * max_ratio) if max_ratio > 0 else recommended_min
+    return {
+        "id": meal.id,
+        "key": meal.key,
+        "name": meal.name,
+        "icon_url": meal.icon_url,
+        "min_ratio": min_ratio,
+        "max_ratio": max_ratio,
+        "recommended_min": recommended_min,
+        "recommended_max": recommended_max,
+        "sort_order": meal.sort_order,
+        "is_active": meal.is_active,
+    }
 
 
 @router.get("/categories")
@@ -92,6 +126,29 @@ def list_categories(
         return handle_exception(exc)
 
 
+@router.get("/meals")
+def list_meals(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        meals = (
+            db.query(MealConfig)
+            .filter(MealConfig.is_active == True)
+            .order_by(MealConfig.sort_order.asc(), MealConfig.name.asc())
+            .all()
+        )
+        daily_goal = _daily_goal_calories(db, current_user.id)
+        payload = [_meal_payload(meal, daily_goal) for meal in meals]
+        return create_response(
+            message="Meals fetched",
+            data={"goal_calories": daily_goal, "meals": payload},
+            status_code=status.HTTP_200_OK,
+        )
+    except Exception as exc:
+        return handle_exception(exc)
+
+
 @admin_router.get("/categories")
 def admin_list_categories(
     include_inactive: bool = Query(True),
@@ -108,6 +165,124 @@ def admin_list_categories(
             data={"count": len(payload), "categories": payload},
             status_code=status.HTTP_200_OK,
         )
+    except Exception as exc:
+        return handle_exception(exc)
+
+
+@admin_router.get("/meals")
+def admin_list_meals(
+    include_inactive: bool = Query(True),
+    db: Session = Depends(get_db),
+):
+    try:
+        query = db.query(MealConfig).order_by(MealConfig.sort_order.asc(), MealConfig.name.asc())
+        if not include_inactive:
+            query = query.filter(MealConfig.is_active == True)
+        meals = query.all()
+        payload = [MealConfigResponse.model_validate(meal).model_dump() for meal in meals]
+        return create_response(
+            message="Admin meals fetched",
+            data={"count": len(payload), "meals": payload},
+            status_code=status.HTTP_200_OK,
+        )
+    except Exception as exc:
+        return handle_exception(exc)
+
+
+@admin_router.post("/meals")
+def admin_create_meal(
+    payload: MealConfigCreate,
+    db: Session = Depends(get_db),
+):
+    try:
+        existing = db.query(MealConfig).filter(MealConfig.key == payload.key).first()
+        if existing:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Meal key already exists")
+        meal = MealConfig(
+            key=payload.key,
+            name=payload.name.strip(),
+            icon_url=payload.icon_url,
+            min_ratio=payload.min_ratio,
+            max_ratio=payload.max_ratio,
+            sort_order=payload.sort_order,
+            is_active=payload.is_active,
+        )
+        db.add(meal)
+        db.commit()
+        db.refresh(meal)
+        return create_response(
+            message="Meal created",
+            data=MealConfigResponse.model_validate(meal).model_dump(),
+            status_code=status.HTTP_201_CREATED,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        return handle_exception(exc)
+
+
+@admin_router.put("/meals/{meal_id}")
+def admin_update_meal(
+    meal_id: int,
+    payload: MealConfigUpdate,
+    db: Session = Depends(get_db),
+):
+    try:
+        meal = db.query(MealConfig).filter(MealConfig.id == meal_id).first()
+        if not meal:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Meal not found")
+        if payload.key is not None:
+            existing = (
+                db.query(MealConfig)
+                .filter(MealConfig.key == payload.key, MealConfig.id != meal_id)
+                .first()
+            )
+            if existing:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Meal key already exists")
+            meal.key = payload.key
+        if payload.name is not None:
+            meal.name = payload.name.strip()
+        if payload.icon_url is not None:
+            meal.icon_url = payload.icon_url
+        if payload.min_ratio is not None:
+            meal.min_ratio = payload.min_ratio
+        if payload.max_ratio is not None:
+            meal.max_ratio = payload.max_ratio
+        if payload.sort_order is not None:
+            meal.sort_order = payload.sort_order
+        if payload.is_active is not None:
+            meal.is_active = payload.is_active
+        db.commit()
+        db.refresh(meal)
+        return create_response(
+            message="Meal updated",
+            data=MealConfigResponse.model_validate(meal).model_dump(),
+            status_code=status.HTTP_200_OK,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        return handle_exception(exc)
+
+
+@admin_router.delete("/meals/{meal_id}")
+def admin_delete_meal(
+    meal_id: int,
+    db: Session = Depends(get_db),
+):
+    try:
+        meal = db.query(MealConfig).filter(MealConfig.id == meal_id).first()
+        if not meal:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Meal not found")
+        db.delete(meal)
+        db.commit()
+        return create_response(
+            message="Meal deleted",
+            data={"deleted": True, "meal_id": meal_id},
+            status_code=status.HTTP_200_OK,
+        )
+    except HTTPException:
+        raise
     except Exception as exc:
         return handle_exception(exc)
 
@@ -440,6 +615,7 @@ async def create_log(
     current_user: User = Depends(get_current_user),
 ):
     try:
+        meal_type = body.meal_type or "unspecified"
         servings = body.servings or 1.0
         if servings <= 0:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Servings must be positive")
@@ -465,6 +641,7 @@ async def create_log(
                     FoodLog.user_id == current_user.id,
                     FoodLog.consumed_date == consumed_date,
                     FoodLog.barcode == barcode,
+                    FoodLog.meal_type == meal_type,
                 )
                 .first()
             )
@@ -475,6 +652,7 @@ async def create_log(
                     FoodLog.user_id == current_user.id,
                     FoodLog.consumed_date == consumed_date,
                     FoodLog.food_item_id == food_item_id,
+                    FoodLog.meal_type == meal_type,
                 )
                 .first()
             )
@@ -509,6 +687,7 @@ async def create_log(
                 carbs=carbs,
                 fat=fat,
                 notes=body.notes,
+                meal_type=meal_type,
                 consumed_date=consumed_date,
             )
             db.add(log)
@@ -526,10 +705,107 @@ async def create_log(
         return handle_exception(exc)
 
 
+@router.put("/logs/{log_id}")
+def update_log(
+    log_id: int,
+    body: LogUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        log = (
+            db.query(FoodLog)
+            .filter(FoodLog.id == log_id, FoodLog.user_id == current_user.id)
+            .first()
+        )
+        if not log:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Log not found")
+
+        current_servings = log.serving_multiplier or 1.0
+        if current_servings <= 0:
+            current_servings = 1.0
+
+        def scale_value(total: float | None) -> float | None:
+            if total is None:
+                return None
+            return total / current_servings
+
+        item = log.food_item
+        calories_per = (
+            item.calories
+            if item and item.calories is not None
+            else scale_value(log.calories)
+        )
+        protein_per = (
+            item.protein
+            if item and item.protein is not None
+            else scale_value(log.protein)
+        )
+        carbs_per = (
+            item.carbs
+            if item and item.carbs is not None
+            else scale_value(log.carbs)
+        )
+        fat_per = (
+            item.fat
+            if item and item.fat is not None
+            else scale_value(log.fat)
+        )
+
+        log.serving_multiplier = body.servings
+        log.calories = calories_per * body.servings if calories_per is not None else log.calories
+        log.protein = protein_per * body.servings if protein_per is not None else log.protein
+        log.carbs = carbs_per * body.servings if carbs_per is not None else log.carbs
+        log.fat = fat_per * body.servings if fat_per is not None else log.fat
+        if body.notes is not None:
+            log.notes = body.notes
+
+        db.commit()
+        db.refresh(log)
+
+        return create_response(
+            message="Food log updated",
+            data=_log_payload(log),
+            status_code=status.HTTP_200_OK,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        return handle_exception(exc)
+
+
+@router.delete("/logs/{log_id}")
+def delete_log(
+    log_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        log = (
+            db.query(FoodLog)
+            .filter(FoodLog.id == log_id, FoodLog.user_id == current_user.id)
+            .first()
+        )
+        if not log:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Log not found")
+        db.delete(log)
+        db.commit()
+        return create_response(
+            message="Food log deleted",
+            data={"deleted": True, "log_id": log_id},
+            status_code=status.HTTP_200_OK,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        return handle_exception(exc)
+
+
 @router.get("/logs")
 def list_logs(
     start_date: str | None = Query(None),
     end_date: str | None = Query(None),
+    meal_type: str | None = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -540,6 +816,8 @@ def list_logs(
             query = query.filter(FoodLog.consumed_date >= date.fromisoformat(start_date))
         if end_date:
             query = query.filter(FoodLog.consumed_date <= date.fromisoformat(end_date))
+        if meal_type:
+            query = query.filter(FoodLog.meal_type == meal_type.strip().lower())
 
         logs = query.all()
         payload = [_log_payload(log) for log in logs]
@@ -629,16 +907,16 @@ def calorie_summary(
 
 @router.get("/logs/today")
 def today_nutrition(
+    meal_type: str | None = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     try:
         today = date.today()
-        logs = (
-            db.query(FoodLog)
-            .filter(FoodLog.user_id == current_user.id, FoodLog.consumed_date == today)
-            .all()
-        )
+        query = db.query(FoodLog).filter(FoodLog.user_id == current_user.id, FoodLog.consumed_date == today)
+        if meal_type:
+            query = query.filter(FoodLog.meal_type == meal_type.strip().lower())
+        logs = query.all()
 
         total_calories = sum(log.calories or 0 for log in logs)
         total_protein = sum(log.protein or 0 for log in logs)
@@ -653,6 +931,7 @@ def today_nutrition(
                 "protein": round(total_protein, 2),
                 "carbs": round(total_carbs, 2),
                 "fat": round(total_fat, 2),
+                "items": [_log_payload(log) for log in logs],
             },
             status_code=status.HTTP_200_OK,
         )

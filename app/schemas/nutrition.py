@@ -33,6 +33,7 @@ class LogCreate(BaseModel):
     servings: float = 1.0
     notes: str | None = None
     consumed_date: str | None = None
+    meal_type: str | None = None
 
     @field_validator("consumed_date")
     @classmethod
@@ -40,6 +41,26 @@ class LogCreate(BaseModel):
         if value is None:
             return None
         date.fromisoformat(value)
+        return value
+
+    @field_validator("meal_type")
+    @classmethod
+    def normalize_meal_type(cls, value):
+        if value is None:
+            return None
+        normalized = value.strip().lower()
+        return normalized or None
+
+
+class LogUpdate(BaseModel):
+    servings: float
+    notes: str | None = None
+
+    @field_validator("servings")
+    @classmethod
+    def validate_servings(cls, value):
+        if value <= 0:
+            raise ValueError("servings must be positive")
         return value
 
 
@@ -52,6 +73,7 @@ class FoodLogEntry(BaseModel):
     carbs: float | None
     fat: float | None
     notes: str | None
+    meal_type: str | None
     food_item: FoodItemResponse | None
 
     model_config = {"from_attributes": True}
@@ -103,3 +125,52 @@ class FoodItemAdminPayload(BaseModel):
 
     class Config:
         allow_population_by_field_name = True
+
+
+class MealConfigResponse(BaseModel):
+    id: int
+    key: str
+    name: str
+    icon_url: str | None = None
+    min_ratio: float
+    max_ratio: float
+    sort_order: int
+    is_active: bool
+
+    model_config = {"from_attributes": True}
+
+
+class MealConfigCreate(BaseModel):
+    key: str
+    name: str
+    icon_url: str | None = None
+    min_ratio: float = 0.0
+    max_ratio: float = 0.0
+    sort_order: int = 0
+    is_active: bool = True
+
+    @field_validator("key")
+    @classmethod
+    def normalize_key(cls, value):
+        normalized = value.strip().lower().replace(" ", "_")
+        if not normalized:
+            raise ValueError("key is required")
+        return normalized
+
+
+class MealConfigUpdate(BaseModel):
+    key: str | None = None
+    name: str | None = None
+    icon_url: str | None = None
+    min_ratio: float | None = None
+    max_ratio: float | None = None
+    sort_order: int | None = None
+    is_active: bool | None = None
+
+    @field_validator("key")
+    @classmethod
+    def normalize_key(cls, value):
+        if value is None:
+            return None
+        normalized = value.strip().lower().replace(" ", "_")
+        return normalized or None

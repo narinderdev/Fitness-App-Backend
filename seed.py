@@ -130,6 +130,33 @@ DEFAULT_EXERCISE_LIBRARY_ITEMS = [
 
 DEFAULT_GOAL_QUESTIONS = [
     {
+        "question": "What is your gender?",
+        "description": "Select the gender that best describes you.",
+        "answer_type": "single_choice",
+        "is_required": True,
+        "options": [
+            {"option_text": "Male", "value": "male"},
+            {"option_text": "Female", "value": "female"},
+            {"option_text": "Other", "value": "other"},
+        ],
+    },
+    {
+        "question": "What is your date of birth?",
+        "description": "Select your date of birth.",
+        "answer_type": "date",
+        "is_required": True,
+    },
+    {
+        "question": "What is your height?",
+        "description": "Enter your height.",
+        "answer_type": "height",
+        "is_required": True,
+        "options": [
+            {"option_text": "cm", "value": "cm"},
+            {"option_text": "ft", "value": "ft"},
+        ],
+    },
+    {
         "question": "What is your current weight?",
         "description": "Enter your current weight.",
         "answer_type": "weight",

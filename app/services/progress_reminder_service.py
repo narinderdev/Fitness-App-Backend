@@ -24,6 +24,7 @@ from app.services.measurement_utils import (
 logger = logging.getLogger(__name__)
 
 CALORIES_PER_STEP = 0.04
+REFERENCE_WEIGHT_KG = 70
 DEFAULT_BASE_CALORIES = 1200
 MAX_BASE_CALORIES = 4000
 ACTIVITY_MULTIPLIER = 1.2
@@ -151,9 +152,9 @@ def _calculate_target_calories(session, user_id: int) -> tuple[int, int] | None:
     else:
         daily_delta = (abs(delta) * 7700) / timeframe_days
         target = maintenance + (daily_delta if delta > 0 else -daily_delta)
-    target_calories = round(max(DEFAULT_BASE_CALORIES, min(MAX_BASE_CALORIES, target)))
+    target_calories = round(max(DEFAULT_BASE_CALORIES, target))
 
-    burned_calories = _todays_burned_calories(session, user_id)
+    burned_calories = _todays_burned_calories(session, user_id, current_weight)
     return target_calories, burned_calories
 
 
@@ -369,7 +370,7 @@ def _todays_consumed_calories(session, user_id: int) -> float:
     return sum(log.calories or 0 for log in logs)
 
 
-def _todays_burned_calories(session, user_id: int) -> int:
+def _todays_burned_calories(session, user_id: int, weight_kg: float | None) -> int:
     today = date.today()
     step = (
         session.query(HealthStep)
@@ -377,7 +378,8 @@ def _todays_burned_calories(session, user_id: int) -> int:
         .first()
     )
     steps = step.steps if step else 0
-    return round(steps * CALORIES_PER_STEP)
+    weight = max(weight_kg or REFERENCE_WEIGHT_KG, 1)
+    return round(steps * CALORIES_PER_STEP * (weight / REFERENCE_WEIGHT_KG))
 
 
 def _format_progress_body(remaining: int, target: int) -> str:

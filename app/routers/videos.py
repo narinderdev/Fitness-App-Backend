@@ -5,6 +5,7 @@ from fastapi import (
     Query,
     status,
 )
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -64,6 +65,47 @@ def _pagination_meta(page: int, page_size: int, total: int, count: int) -> dict:
     }
 
 
+def _build_category_alias_lookup() -> dict[str, str]:
+    lookup: dict[str, str] = {}
+    for canonical, aliases in CATEGORY_DB_ALIASES.items():
+        for alias in aliases:
+            normalized = alias.strip().lower()
+            if normalized:
+                lookup[normalized] = canonical
+        lookup[canonical.strip().lower()] = canonical
+    return lookup
+
+
+_CATEGORY_ALIAS_LOOKUP = _build_category_alias_lookup()
+
+
+def _category_key(value: str | None) -> str:
+    raw = (value or "").strip()
+    if not raw:
+        return "Uncategorized"
+    normalized = raw.lower()
+    mapped = _CATEGORY_ALIAS_LOOKUP.get(normalized)
+    if mapped:
+        return mapped
+    normalized_from_slug = normalize_category(raw)
+    if normalized_from_slug:
+        return normalized_from_slug
+    return raw
+
+
+def _category_counts(query) -> dict[str, int]:
+    rows = (
+        query.with_entities(Video.body_part, func.count(Video.id))
+        .group_by(Video.body_part)
+        .all()
+    )
+    counts: dict[str, int] = {}
+    for body_part, count in rows:
+        key = _category_key(body_part)
+        counts[key] = counts.get(key, 0) + int(count or 0)
+    return counts
+
+
 @router.get("/db/{category}")
 def fetch_db_videos(
     category: str,
@@ -84,11 +126,9 @@ def fetch_db_videos(
             .subquery()
         )
 
-        base_query = (
-            db.query(Video)
-                .filter(~Video.id.in_(plan_video_subquery))
-                .order_by(Video.created_at.desc())
-        )
+        all_query = db.query(Video).filter(~Video.id.in_(plan_video_subquery))
+        category_counts = _category_counts(all_query)
+        base_query = all_query.order_by(Video.created_at.desc())
         if normalized:
             db_values = _db_values_for_category(normalized)
             base_query = base_query.filter(Video.body_part.in_(db_values))
@@ -111,6 +151,7 @@ def fetch_db_videos(
                 "category": "all" if requesting_all else normalized,
                 "source": "database",
                 **_pagination_meta(page, page_size, total, len(payload)),
+                "category_counts": category_counts,
                 "videos": payload,
             },
             status_code=status.HTTP_200_OK,

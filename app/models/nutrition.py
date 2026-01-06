@@ -87,3 +87,25 @@ class FoodLog(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     food_item = relationship("FoodItem", back_populates="logs")
+
+
+class WishlistItem(Base):
+    __tablename__ = "wishlist_items"
+    __table_args__ = (UniqueConstraint("user_id", "food_item_id", name="uq_wishlist_user_food_item"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    food_item_id = Column(Integer, ForeignKey("food_items.id", ondelete="SET NULL"), nullable=True)
+    barcode = Column(String, nullable=True)
+    product_name = Column(String, nullable=False)
+    brand = Column(String, nullable=True)
+    calories = Column(Float, nullable=True)
+    protein = Column(Float, nullable=True)
+    carbs = Column(Float, nullable=True)
+    fat = Column(Float, nullable=True)
+    serving_quantity = Column(Float, nullable=True)
+    serving_unit = Column(String, nullable=True)
+    image_url = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    food_item = relationship("FoodItem")

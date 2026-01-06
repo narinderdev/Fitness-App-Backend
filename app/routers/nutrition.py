@@ -5,7 +5,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models.nutrition import FoodItem, FoodLog, FoodCategory, MealConfig
+from app.models.nutrition import FoodItem, FoodLog, FoodCategory, MealConfig, WishlistItem
 from app.models.user import User
 from app.schemas.nutrition import (
     FoodCategoryCreate,
@@ -17,6 +17,8 @@ from app.schemas.nutrition import (
     LogCreate,
     LogUpdate,
     ScanRequest,
+    WishlistCreate,
+    WishlistItemResponse,
     MealConfigCreate,
     MealConfigResponse,
     MealConfigUpdate,
@@ -73,6 +75,28 @@ def _log_payload(log: FoodLog) -> dict:
         notes=log.notes,
         meal_type=log.meal_type,
         food_item=item,
+    ).model_dump()
+    return payload
+
+
+def _wishlist_payload(entry: WishlistItem) -> dict:
+    item_payload = FoodItemResponse(
+        id=entry.food_item_id,
+        barcode=entry.barcode,
+        product_name=entry.product_name,
+        brand=entry.brand,
+        calories=entry.calories,
+        protein=entry.protein,
+        carbs=entry.carbs,
+        fat=entry.fat,
+        serving_quantity=entry.serving_quantity,
+        serving_unit=entry.serving_unit,
+        image_url=entry.image_url,
+    ).model_dump()
+    payload = WishlistItemResponse(
+        id=entry.id,
+        created_at=entry.created_at.isoformat(),
+        food_item=item_payload,
     ).model_dump()
     return payload
 
@@ -604,6 +628,143 @@ async def scan_barcode(
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"OpenFoodFacts error: {exc.response.status_code}")
     except httpx.RequestError:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Unable to reach OpenFoodFacts")
+    except Exception as exc:
+        return handle_exception(exc)
+
+
+@router.get("/wishlist")
+def list_wishlist(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        items = (
+            db.query(WishlistItem)
+            .filter(WishlistItem.user_id == current_user.id)
+            .order_by(WishlistItem.created_at.desc())
+            .all()
+        )
+        payload = [_wishlist_payload(item) for item in items]
+        return create_response(
+            message="Wishlist fetched",
+            data={"count": len(payload), "items": payload},
+            status_code=status.HTTP_200_OK,
+        )
+    except Exception as exc:
+        return handle_exception(exc)
+
+
+@router.post("/wishlist")
+async def add_to_wishlist(
+    body: WishlistCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        food_item_id = body.food_item_id
+        barcode = body.barcode.strip() if body.barcode else None
+        if not food_item_id and not barcode:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="food_item_id or barcode is required",
+            )
+
+        food_item = None
+        if food_item_id:
+            food_item = db.query(FoodItem).filter(FoodItem.id == food_item_id).first()
+            if not food_item:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Food item not found")
+        elif barcode:
+            food_item = await get_or_create_food_item(db, barcode)
+            if not food_item:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+
+        existing = None
+        if food_item_id:
+            existing = (
+                db.query(WishlistItem)
+                .filter(
+                    WishlistItem.user_id == current_user.id,
+                    WishlistItem.food_item_id == food_item_id,
+                )
+                .first()
+            )
+        if not existing and barcode:
+            existing = (
+                db.query(WishlistItem)
+                .filter(
+                    WishlistItem.user_id == current_user.id,
+                    WishlistItem.barcode == barcode,
+                )
+                .first()
+            )
+        if existing:
+            return create_response(
+                message="Already in wishlist",
+                data=_wishlist_payload(existing),
+                status_code=status.HTTP_200_OK,
+            )
+
+        name = (food_item.product_name or food_item.brand or "Food item").strip()
+        entry = WishlistItem(
+            user_id=current_user.id,
+            food_item_id=food_item.id if food_item else None,
+            barcode=food_item.barcode if food_item else barcode,
+            product_name=name,
+            brand=food_item.brand if food_item else None,
+            calories=food_item.calories if food_item else None,
+            protein=food_item.protein if food_item else None,
+            carbs=food_item.carbs if food_item else None,
+            fat=food_item.fat if food_item else None,
+            serving_quantity=food_item.serving_quantity if food_item else None,
+            serving_unit=food_item.serving_unit if food_item else None,
+            image_url=food_item.image_url if food_item else None,
+        )
+        db.add(entry)
+        db.commit()
+        db.refresh(entry)
+
+        return create_response(
+            message="Added to wishlist",
+            data=_wishlist_payload(entry),
+            status_code=status.HTTP_201_CREATED,
+        )
+    except HTTPException:
+        raise
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"OpenFoodFacts error: {exc.response.status_code}")
+    except httpx.RequestError:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Unable to reach OpenFoodFacts")
+    except Exception as exc:
+        return handle_exception(exc)
+
+
+@router.delete("/wishlist/{item_id}")
+def remove_from_wishlist(
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        entry = (
+            db.query(WishlistItem)
+            .filter(
+                WishlistItem.id == item_id,
+                WishlistItem.user_id == current_user.id,
+            )
+            .first()
+        )
+        if not entry:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Wishlist item not found")
+        db.delete(entry)
+        db.commit()
+        return create_response(
+            message="Wishlist item removed",
+            data=None,
+            status_code=status.HTTP_200_OK,
+        )
+    except HTTPException:
+        raise
     except Exception as exc:
         return handle_exception(exc)
 

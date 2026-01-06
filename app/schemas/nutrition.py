@@ -27,6 +27,19 @@ class FoodItemResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class WishlistCreate(BaseModel):
+    food_item_id: int | None = None
+    barcode: str | None = None
+
+
+class WishlistItemResponse(BaseModel):
+    id: int
+    created_at: str
+    food_item: FoodItemResponse
+
+    model_config = {"from_attributes": True}
+
+
 class LogCreate(BaseModel):
     barcode: str | None = None
     food_item_id: int | None = None

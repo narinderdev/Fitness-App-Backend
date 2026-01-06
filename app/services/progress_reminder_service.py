@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from collections import defaultdict
-from datetime import date
+from datetime import date, datetime
 
 from sqlalchemy.orm import joinedload
 
@@ -14,13 +14,21 @@ from app.models.user import User
 from app.models.water import DeviceToken
 from app.models.weight import WeightLog
 from app.services.firebase_service import send_push_notification
-from app.services.measurement_utils import parse_numeric_value, weight_kg_from_answer
+from app.services.measurement_utils import (
+    convert_height_to_m,
+    parse_numeric_value,
+    resolve_height_unit,
+    weight_kg_from_answer,
+)
 
 logger = logging.getLogger(__name__)
 
 CALORIES_PER_STEP = 0.04
 DEFAULT_BASE_CALORIES = 1200
 MAX_BASE_CALORIES = 4000
+ACTIVITY_MULTIPLIER = 1.2
+BMR_MALE_OFFSET = 5
+BMR_FEMALE_OFFSET = -161
 
 
 class ProgressReminderScheduler:
@@ -118,6 +126,7 @@ def _build_user_reminder(session, user_id: int) -> tuple[str, str, dict[str, str
 def _calculate_target_calories(session, user_id: int) -> tuple[int, int] | None:
     current_weight = _latest_weight_kg(session, user_id)
     answers = _fetch_answers(session, user_id)
+    user = session.query(User).filter(User.id == user_id).first()
     if current_weight is None:
         current_weight = _current_weight_from_answers(answers)
     goal_weight = _goal_weight_from_answers(answers)
@@ -125,7 +134,17 @@ def _calculate_target_calories(session, user_id: int) -> tuple[int, int] | None:
     if current_weight is None or goal_weight is None or not timeframe_days:
         return None
 
-    maintenance = current_weight * 30
+    height_cm = _height_cm_from_answers(answers)
+    age_years = _age_years_from_answers(answers)
+    if age_years is None and user and user.dob:
+        age_years = _age_from_raw_date(user.dob)
+    gender = _gender_from_answers(answers) or (user.gender if user else None)
+    maintenance = _estimate_maintenance_calories(
+        weight_kg=current_weight,
+        height_cm=height_cm,
+        age_years=age_years,
+        gender=gender,
+    )
     delta = goal_weight - current_weight
     if abs(delta) < 0.01 or timeframe_days <= 0:
         target = maintenance
@@ -239,6 +258,105 @@ def _resolve_unit(answer: UserAnswer) -> str | None:
 def _question_contains(question: str, keywords: list[str]) -> bool:
     normalized = question.lower()
     return any(keyword in normalized for keyword in keywords)
+
+
+def _height_cm_from_answers(answers: list[UserAnswer]) -> float | None:
+    for entry in answers:
+        question = entry.question.question if entry.question else ""
+        answer_type = (entry.question.answer_type if entry.question else "").lower()
+        if answer_type != "height" and "height" not in question.lower():
+            continue
+        value = parse_numeric_value(entry.answer_text)
+        if value is None:
+            continue
+        unit = resolve_height_unit(entry)
+        height_m = convert_height_to_m(value, unit)
+        if height_m is None:
+            continue
+        return height_m * 100
+    return None
+
+
+def _age_years_from_answers(answers: list[UserAnswer]) -> int | None:
+    answer = _find_answer_by_keywords(
+        answers,
+        include=["date of birth", "dob", "birth"],
+    )
+    raw = answer.answer_text if answer else None
+    return _age_from_raw_date(raw)
+
+
+def _age_from_raw_date(raw: str | None) -> int | None:
+    if not raw or not raw.strip():
+        return None
+    parsed = None
+    try:
+        parsed = datetime.fromisoformat(raw.strip())
+    except ValueError:
+        try:
+            parsed = datetime.fromisoformat(raw.strip()[:10])
+        except ValueError:
+            return None
+    return _age_from_date(parsed.date())
+
+
+def _age_from_date(dob: date) -> int | None:
+    today = date.today()
+    age = today.year - dob.year
+    if (today.month, today.day) < (dob.month, dob.day):
+        age -= 1
+    return age if age >= 0 else None
+
+
+def _gender_from_answers(answers: list[UserAnswer]) -> str | None:
+    answer = _find_answer_by_keywords(answers, include=["gender"])
+    if not answer:
+        return None
+    raw = None
+    for selection in answer.selected_options or []:
+        option = selection.option
+        if not option:
+            continue
+        for source in (option.value, option.option_text):
+            if source and source.strip():
+                raw = source.strip()
+                break
+        if raw:
+            break
+    raw = raw or answer.answer_text
+    if not raw:
+        return None
+    normalized = raw.strip().lower()
+    if "female" in normalized:
+        return "female"
+    if "male" in normalized:
+        return "male"
+    return None
+
+
+def _estimate_maintenance_calories(
+    *,
+    weight_kg: float,
+    height_cm: float | None,
+    age_years: int | None,
+    gender: str | None,
+) -> float:
+    if height_cm is not None and age_years is not None:
+        base = (10 * weight_kg) + (6.25 * height_cm) - (5 * age_years)
+        offset = _gender_bmr_offset(gender)
+        bmr = base + offset
+        if bmr > 0:
+            return bmr * ACTIVITY_MULTIPLIER
+    return weight_kg * 30
+
+
+def _gender_bmr_offset(gender: str | None) -> float:
+    normalized = (gender or "").strip().lower()
+    if normalized == "male":
+        return BMR_MALE_OFFSET
+    if normalized == "female":
+        return BMR_FEMALE_OFFSET
+    return 0
 
 
 def _todays_consumed_calories(session, user_id: int) -> float:

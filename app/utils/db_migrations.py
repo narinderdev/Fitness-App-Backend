@@ -7,10 +7,21 @@ def ensure_program_price_column(engine: Engine) -> None:
     if "programs" not in inspector.get_table_names():
         return
     columns = {column["name"] for column in inspector.get_columns("programs")}
-    if "price_usd" in columns:
+    pricing_columns = [
+        "price_usd",
+        "weekly_price_usd",
+        "weekly_original_price_usd",
+        "monthly_price_usd",
+        "monthly_original_price_usd",
+        "yearly_price_usd",
+        "yearly_original_price_usd",
+    ]
+    missing_columns = [column for column in pricing_columns if column not in columns]
+    if not missing_columns:
         return
     with engine.begin() as connection:
-        connection.execute(text("ALTER TABLE programs ADD COLUMN price_usd FLOAT"))
+        for column in missing_columns:
+            connection.execute(text(f"ALTER TABLE programs ADD COLUMN {column} FLOAT"))
 
 
 def drop_food_category_slug_and_sort(engine: Engine) -> None:

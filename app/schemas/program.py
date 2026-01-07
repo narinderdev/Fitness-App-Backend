@@ -23,6 +23,12 @@ class ProgramBase(BaseModel):
     level: str | None = Field(None, max_length=50)
     access_level: ProgramVisibility = ProgramVisibility.free
     price_usd: float | None = Field(None, ge=0)
+    weekly_price_usd: float | None = Field(None, ge=0)
+    weekly_original_price_usd: float | None = Field(None, ge=0)
+    monthly_price_usd: float | None = Field(None, ge=0)
+    monthly_original_price_usd: float | None = Field(None, ge=0)
+    yearly_price_usd: float | None = Field(None, ge=0)
+    yearly_original_price_usd: float | None = Field(None, ge=0)
     cta_label: str | None = Field(None, max_length=120)
     hero_image_url: str | None = None
     cover_image_url: str | None = None
@@ -45,6 +51,12 @@ class ProgramUpdate(BaseModel):
     level: str | None = Field(None, max_length=50)
     access_level: ProgramVisibility | None = None
     price_usd: float | None = Field(None, ge=0)
+    weekly_price_usd: float | None = Field(None, ge=0)
+    weekly_original_price_usd: float | None = Field(None, ge=0)
+    monthly_price_usd: float | None = Field(None, ge=0)
+    monthly_original_price_usd: float | None = Field(None, ge=0)
+    yearly_price_usd: float | None = Field(None, ge=0)
+    yearly_original_price_usd: float | None = Field(None, ge=0)
     cta_label: str | None = Field(None, max_length=120)
     hero_image_url: str | None = None
     cover_image_url: str | None = None

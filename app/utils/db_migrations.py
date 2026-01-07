@@ -79,3 +79,42 @@ def drop_food_category_slug_and_sort(engine: Engine) -> None:
     with engine.begin() as connection:
         for column in columns_to_drop:
             connection.execute(text(f"ALTER TABLE food_categories DROP COLUMN {column}"))
+
+
+def ensure_user_flag_columns(engine: Engine) -> None:
+    inspector = inspect(engine)
+    if "users" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("users")}
+    flag_columns = [
+        "has_pilates_board",
+        "has_ankle_wrist_weights",
+        "is_first_purchase",
+    ]
+
+    missing_columns = [column for column in flag_columns if column not in columns]
+    if not missing_columns:
+        return
+
+    with engine.begin() as connection:
+        for column in missing_columns:
+            if engine.dialect.name == "postgresql":
+                connection.execute(
+                    text(
+                        f"""
+                        ALTER TABLE users
+                        ADD COLUMN IF NOT EXISTS {column} BOOLEAN DEFAULT FALSE
+                        """
+                    )
+                )
+            else:
+                # SQLite / others
+                connection.execute(
+                    text(
+                        f"""
+                        ALTER TABLE users
+                        ADD COLUMN {column} BOOLEAN DEFAULT 0
+                        """
+                    )
+                )

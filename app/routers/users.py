@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.user import User
-from app.schemas.user import ProfileResponse
+from app.schemas.user import ProfileResponse, UserFlagsUpdate
 from app.utils.response import create_response, handle_exception
 from app.services.auth_middleware import get_current_admin
 
@@ -66,6 +66,41 @@ def update_user_status(
         message = "User activated successfully" if is_active else "User deactivated successfully"
         return create_response(
             message=message,
+            data=payload,
+            status_code=status.HTTP_200_OK,
+        )
+    except Exception as exc:
+        return handle_exception(exc)
+
+
+@router.put("/{user_id}/flags")
+def update_user_flags(
+    user_id: int,
+    payload: UserFlagsUpdate,
+    db: Session = Depends(get_db),
+    current_admin=Depends(get_current_admin)
+):
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+        update_data = payload.model_dump(exclude_unset=True)
+        if not update_data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No flags provided",
+            )
+
+        for field, value in update_data.items():
+            setattr(user, field, value)
+
+        db.commit()
+        db.refresh(user)
+
+        payload = ProfileResponse.model_validate(user).model_dump()
+        return create_response(
+            message="User flags updated successfully",
             data=payload,
             status_code=status.HTTP_200_OK,
         )

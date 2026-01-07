@@ -27,3 +27,8 @@ class User(Base):
 
     # Admin flag
     is_admin = Column(Boolean, default=False, nullable=False)
+
+    # Purchase flags
+    has_pilates_board = Column(Boolean, default=False, nullable=False)
+    has_ankle_wrist_weights = Column(Boolean, default=False, nullable=False)
+    is_first_purchase = Column(Boolean, default=False, nullable=False)

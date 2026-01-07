@@ -725,7 +725,7 @@ async def add_to_wishlist(
         db.refresh(entry)
 
         return create_response(
-            message="Added to wishlist",
+            message="Added to favourites",
             data=_wishlist_payload(entry),
             status_code=status.HTTP_201_CREATED,
         )

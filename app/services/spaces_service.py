@@ -14,6 +14,7 @@ s3 = session.client(
 BUCKET = os.getenv("SPACES_NAME")
 CDN_URL = os.getenv("SPACES_CDN_URL")
 BASE_PATH = (os.getenv("DO_SPACES_BASE_PATH") or "fitness_app").strip("/")
+PROGRESS_PHOTO_FOLDER = (os.getenv("DO_PROGRESS_PHOTO_FOLDER") or "profile_images").strip("/")
 
 # EXACT category mapping based on your DigitalOcean folders
 CATEGORY_MAP = {
@@ -102,4 +103,9 @@ def upload_category_video(data: bytes, filename: str, body_part: str, content_ty
 
 def upload_category_thumbnail(data: bytes, filename: str, body_part: str, content_type: str | None = None) -> str:
     key = _build_key(body_part, filename, subfolder="thumbnails")
+    return _upload_file(data, key, content_type)
+
+
+def upload_progress_photo(data: bytes, filename: str, content_type: str | None = None) -> str:
+    key = _join_path(BASE_PATH, PROGRESS_PHOTO_FOLDER, filename)
     return _upload_file(data, key, content_type)

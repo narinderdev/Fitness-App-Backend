@@ -21,6 +21,7 @@ from app.routers import (
     videos,
     water,
     weight,
+    progress_photos,
 )
 from app.utils.response import create_response, handle_exception
 from app.utils.db_migrations import (
@@ -81,6 +82,7 @@ app.include_router(analytics.router)
 app.include_router(subscription_plans.router)
 app.include_router(programs.router)
 app.include_router(exercise_library.router)
+app.include_router(progress_photos.router)
 
 # Serve uploaded assets
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")

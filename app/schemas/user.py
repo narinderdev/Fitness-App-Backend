@@ -51,7 +51,6 @@ class ProfileResponse(BaseModel):
     is_admin: bool
     has_pilates_board: bool
     has_ankle_wrist_weights: bool
-    is_first_purchase: bool
 
     model_config = {"from_attributes": True}
 
@@ -59,4 +58,3 @@ class ProfileResponse(BaseModel):
 class UserFlagsUpdate(BaseModel):
     has_pilates_board: bool | None = None
     has_ankle_wrist_weights: bool | None = None
-    is_first_purchase: bool | None = None

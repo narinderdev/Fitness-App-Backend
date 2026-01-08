@@ -92,6 +92,15 @@ def update_user_flags(
                 detail="No flags provided",
             )
 
+        if update_data.get("has_pilates_board") is False:
+            update_data["has_ankle_wrist_weights"] = False
+
+        if update_data.get("has_ankle_wrist_weights") is True and not user.has_pilates_board:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Enable Pilates Board before setting Ankle/Wrist weights",
+            )
+
         for field, value in update_data.items():
             setattr(user, field, value)
 
@@ -100,7 +109,7 @@ def update_user_flags(
 
         payload = ProfileResponse.model_validate(user).model_dump()
         return create_response(
-            message="User flags updated successfully",
+            message="Purchase updated successfully",
             data=payload,
             status_code=status.HTTP_200_OK,
         )

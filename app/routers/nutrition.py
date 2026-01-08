@@ -776,7 +776,7 @@ async def create_log(
     current_user: User = Depends(get_current_user),
 ):
     try:
-        meal_type = body.meal_type or "unspecified"
+        meal_type = body.meal_type
         servings = body.servings or 1.0
         if servings <= 0:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Servings must be positive")

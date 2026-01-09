@@ -5,7 +5,7 @@ from fastapi import (
     Query,
     status,
 )
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -42,6 +42,13 @@ CATEGORY_DB_ALIASES = {
 }
 DEFAULT_PAGE_SIZE = 20
 MAX_PAGE_SIZE = 100
+PLAN_VIDEO_PATH_TOKENS = (
+    "28 days plan videos",
+    "28%20days%20plan%20videos",
+    "60 days plan videos",
+    "60%20days%20plan%20videos",
+    "/programs/",
+)
 
 
 def _resolve_category(category: str) -> str | None:
@@ -93,6 +100,15 @@ def _category_key(value: str | None) -> str:
     return raw
 
 
+def _plan_video_path_clause():
+    conditions = []
+    for token in PLAN_VIDEO_PATH_TOKENS:
+        like_value = f"%{token}%"
+        conditions.append(Video.video_url.ilike(like_value))
+        conditions.append(Video.thumbnail_url.ilike(like_value))
+    return or_(*conditions)
+
+
 def _category_counts(query) -> dict[str, int]:
     rows = (
         query.with_entities(Video.body_part, func.count(Video.id))
@@ -111,6 +127,7 @@ def fetch_db_videos(
     category: str,
     page: int = Query(1, ge=1),
     page_size: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+    exclude_plan_videos: bool = Query(True),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -120,13 +137,15 @@ def fetch_db_videos(
         if not requesting_all and not normalized:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid category")
 
-        plan_video_subquery = (
-            db.query(ProgramDay.video_id)
-            .filter(ProgramDay.video_id.isnot(None))
-            .subquery()
-        )
-
-        all_query = db.query(Video).filter(~Video.id.in_(plan_video_subquery))
+        all_query = db.query(Video)
+        if exclude_plan_videos:
+            plan_video_subquery = (
+                db.query(ProgramDay.video_id)
+                .filter(ProgramDay.video_id.isnot(None))
+                .subquery()
+            )
+            all_query = all_query.filter(~Video.id.in_(plan_video_subquery))
+            all_query = all_query.filter(~_plan_video_path_clause())
         category_counts = _category_counts(all_query)
         base_query = all_query.order_by(Video.created_at.desc())
         if normalized:

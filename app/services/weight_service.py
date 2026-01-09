@@ -79,6 +79,61 @@ def sync_weight_answer_from_log(db: Session, user: User, weight_kg: float) -> Op
     return answer
 
 
+def resolve_starting_weight(db: Session, user: User) -> tuple[float, datetime] | None:
+    earliest_log = (
+        db.query(WeightLog)
+        .filter(WeightLog.user_id == user.id)
+        .order_by(WeightLog.logged_at.asc())
+        .first()
+    )
+    if earliest_log:
+        return earliest_log.weight_kg, earliest_log.logged_at
+
+    answers = (
+        db.query(UserAnswer)
+        .join(Question, UserAnswer.question_id == Question.id)
+        .filter(UserAnswer.user_id == user.id, Question.is_active == True)
+        .order_by(UserAnswer.created_at.asc())
+        .all()
+    )
+    current_answer = _find_weight_answer(answers, include=["current weight"])
+    if current_answer:
+        parsed = weight_kg_from_answer(current_answer)
+        if parsed is not None and parsed > 0:
+            return parsed, current_answer.created_at
+
+    fallback_answer = _find_weight_answer(
+        answers,
+        include=[],
+        exclude=["goal weight", "target weight"],
+    )
+    if fallback_answer:
+        parsed = weight_kg_from_answer(fallback_answer)
+        if parsed is not None and parsed > 0:
+            return parsed, fallback_answer.created_at
+    return None
+
+
+def _find_weight_answer(
+    answers: list[UserAnswer],
+    include: list[str],
+    exclude: list[str] | None = None,
+) -> Optional[UserAnswer]:
+    for answer in answers:
+        question = answer.question
+        if not question:
+            continue
+        question_text = question.question.lower()
+        if include and not any(keyword in question_text for keyword in include):
+            continue
+        if exclude and any(keyword in question_text for keyword in exclude):
+            continue
+        if question.answer_type.lower() != "weight":
+            continue
+        return answer
+    return None
+
+
 def _resolve_kg_option(question: Question) -> Optional[AnswerOption]:
     kg_aliases = {"kg", "kgs", "kilogram", "kilograms"}
     for option in question.options or []:

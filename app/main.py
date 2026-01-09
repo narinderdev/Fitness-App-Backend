@@ -29,6 +29,8 @@ from app.utils.db_migrations import (
     ensure_program_price_column,
     drop_food_category_slug_and_sort,
     ensure_user_flag_columns,
+    ensure_user_daily_goal_column,
+    ensure_legal_links_subscription_column,
     migrate_app_settings_to_legal_links,
 )
 from seed import run_seed
@@ -57,7 +59,9 @@ async def startup_event():
     ensure_program_price_column(engine)
     drop_food_category_slug_and_sort(engine)
     ensure_user_flag_columns(engine)
+    ensure_user_daily_goal_column(engine)
     migrate_app_settings_to_legal_links(engine)
+    ensure_legal_links_subscription_column(engine)
     run_seed()
     await reminder_scheduler.start()
     await progress_reminder_scheduler.start()

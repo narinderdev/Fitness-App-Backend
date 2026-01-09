@@ -21,6 +21,7 @@ class User(Base):
     photo = Column(String, nullable=True)     # image URL or base64
     bmi_value = Column(Float, nullable=True)
     bmi_category = Column(String, nullable=True)
+    daily_step_goal = Column(Integer, nullable=True, default=7000)
 
     # Soft delete flag
     is_active = Column(Boolean, default=True, nullable=False)

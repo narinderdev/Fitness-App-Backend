@@ -10,7 +10,7 @@ from app.models.weight import WeightLog
 from app.schemas.weight import WeightLogCreate
 from app.services.auth_middleware import get_current_user
 from app.services.bmi_service import recalculate_user_bmi
-from app.services.weight_service import sync_weight_answer_from_log
+from app.services.weight_service import resolve_starting_weight, sync_weight_answer_from_log
 from app.utils.response import create_response, handle_exception
 
 router = APIRouter(prefix="/weight", tags=["Weight"], dependencies=[Depends(get_current_user)])
@@ -103,6 +103,29 @@ def latest_weight(
         return create_response(
             message="Latest weight fetched",
             data={"weight_kg": log.weight_kg, "logged_at": log.logged_at.isoformat()},
+            status_code=status.HTTP_200_OK,
+        )
+    except Exception as exc:
+        return handle_exception(exc)
+
+
+@router.get("/logs/starting")
+def starting_weight(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        resolved = resolve_starting_weight(db, current_user)
+        if not resolved:
+            return create_response(
+                message="No starting weight found",
+                data=None,
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+        weight_kg, logged_at = resolved
+        return create_response(
+            message="Starting weight fetched",
+            data={"weight_kg": weight_kg, "logged_at": logged_at.isoformat()},
             status_code=status.HTTP_200_OK,
         )
     except Exception as exc:

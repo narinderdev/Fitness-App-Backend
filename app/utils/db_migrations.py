@@ -119,6 +119,37 @@ def ensure_user_flag_columns(engine: Engine) -> None:
                 )
 
 
+def ensure_user_daily_goal_column(engine: Engine) -> None:
+    inspector = inspect(engine)
+    if "users" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("users")}
+    if "daily_step_goal" in columns:
+        return
+
+    with engine.begin() as connection:
+        if engine.dialect.name == "postgresql":
+            connection.execute(
+                text(
+                    """
+                    ALTER TABLE users
+                    ADD COLUMN IF NOT EXISTS daily_step_goal INTEGER DEFAULT 7000
+                    """
+                )
+            )
+        else:
+            # SQLite / others
+            connection.execute(
+                text(
+                    """
+                    ALTER TABLE users
+                    ADD COLUMN daily_step_goal INTEGER DEFAULT 7000
+                    """
+                )
+            )
+
+
 def migrate_app_settings_to_legal_links(engine: Engine) -> None:
     inspector = inspect(engine)
     tables = inspector.get_table_names()
@@ -145,3 +176,33 @@ def migrate_app_settings_to_legal_links(engine: Engine) -> None:
                 connection.execute(text("DROP TABLE app_settings"))
             except Exception:
                 pass
+
+
+def ensure_legal_links_subscription_column(engine: Engine) -> None:
+    inspector = inspect(engine)
+    if "legal_links" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("legal_links")}
+    if "subscription_url" in columns:
+        return
+
+    with engine.begin() as connection:
+        if engine.dialect.name == "postgresql":
+            connection.execute(
+                text(
+                    """
+                    ALTER TABLE legal_links
+                    ADD COLUMN IF NOT EXISTS subscription_url VARCHAR
+                    """
+                )
+            )
+        else:
+            connection.execute(
+                text(
+                    """
+                    ALTER TABLE legal_links
+                    ADD COLUMN subscription_url VARCHAR
+                    """
+                )
+            )

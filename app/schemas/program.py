@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from enum import Enum
 from typing import List, Optional
 
@@ -140,6 +140,7 @@ class ProgramDetailResponse(BaseModel):
     days: List[ProgramDayResponse]
     timeline: ProgramTimeline
     available_day: int | None = None
+    start_date: date | None = None
 
 
 class ProgramScheduleDay(BaseModel):

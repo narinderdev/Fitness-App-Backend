@@ -1,5 +1,5 @@
 import logging
-from datetime import date, timedelta, datetime
+from datetime import date, timedelta, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -30,6 +30,8 @@ def log_water(
             body.logged_at,
         )
         logged_at = datetime.fromisoformat(body.logged_at) if body.logged_at else datetime.utcnow()
+        if logged_at.tzinfo is not None:
+            logged_at = logged_at.astimezone(timezone.utc).replace(tzinfo=None)
         log = WaterLog(user_id=current_user.id, amount_ml=body.amount_ml, logged_at=logged_at)
         db.add(log)
         db.commit()
@@ -51,7 +53,7 @@ def today_water(
 ):
     try:
         logger.info("Fetching today's water total for user %s", current_user.id)
-        today = date.today()
+        today = datetime.utcnow().date()
         start = datetime.combine(today, datetime.min.time())
         end = datetime.combine(today, datetime.max.time())
         total = (
@@ -79,7 +81,7 @@ def water_history(
 ):
     try:
         logger.info("Fetching %s-day water history for user %s", days, current_user.id)
-        end_date = date.today()
+        end_date = datetime.utcnow().date()
         start_date = end_date - timedelta(days=days - 1)
         logs = (
             db.query(WaterLog)

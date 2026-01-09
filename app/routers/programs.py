@@ -592,6 +592,7 @@ def get_program_detail(program_identifier: str, db: Session = Depends(get_db), u
             days=[_day_payload(day, progress.get(day.id)) for day in days],
             timeline=_timeline_payload(days),
             available_day=available_day,
+            start_date=enrollment.start_date,
         ).model_dump()
         return create_response(message="Program fetched", data=payload)
     except HTTPException:

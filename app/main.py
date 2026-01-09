@@ -22,12 +22,14 @@ from app.routers import (
     water,
     weight,
     progress_photos,
+    legal_links,
 )
 from app.utils.response import create_response, handle_exception
 from app.utils.db_migrations import (
     ensure_program_price_column,
     drop_food_category_slug_and_sort,
     ensure_user_flag_columns,
+    migrate_app_settings_to_legal_links,
 )
 from seed import run_seed
 from app.services.water_reminder_service import reminder_scheduler
@@ -55,6 +57,7 @@ async def startup_event():
     ensure_program_price_column(engine)
     drop_food_category_slug_and_sort(engine)
     ensure_user_flag_columns(engine)
+    migrate_app_settings_to_legal_links(engine)
     run_seed()
     await reminder_scheduler.start()
     await progress_reminder_scheduler.start()
@@ -83,6 +86,7 @@ app.include_router(subscription_plans.router)
 app.include_router(programs.router)
 app.include_router(exercise_library.router)
 app.include_router(progress_photos.router)
+app.include_router(legal_links.router)
 
 # Serve uploaded assets
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")

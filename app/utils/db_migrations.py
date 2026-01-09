@@ -117,3 +117,31 @@ def ensure_user_flag_columns(engine: Engine) -> None:
                         """
                     )
                 )
+
+
+def migrate_app_settings_to_legal_links(engine: Engine) -> None:
+    inspector = inspect(engine)
+    tables = inspector.get_table_names()
+    if "legal_links" not in tables and "app_settings" not in tables:
+        return
+
+    if "legal_links" not in tables and "app_settings" in tables:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE app_settings RENAME TO legal_links"))
+        return
+
+    if "legal_links" in tables and "app_settings" in tables:
+        with engine.begin() as connection:
+            legal_count = connection.execute(text("SELECT COUNT(*) FROM legal_links")).scalar() or 0
+            if legal_count == 0:
+                connection.execute(
+                    text(
+                        "INSERT INTO legal_links (terms_url, privacy_url, created_at, updated_at) "
+                        "SELECT terms_url, privacy_url, created_at, updated_at "
+                        "FROM app_settings ORDER BY id ASC LIMIT 1"
+                    )
+                )
+            try:
+                connection.execute(text("DROP TABLE app_settings"))
+            except Exception:
+                pass

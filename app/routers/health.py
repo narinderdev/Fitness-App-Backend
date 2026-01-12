@@ -88,7 +88,7 @@ def get_today_steps(
 
 @router.get("/steps/history")
 def get_step_history(
-    days: int = Query(7, ge=1, le=31),
+    days: int = Query(7, ge=1, le=365),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

@@ -224,6 +224,7 @@ def upload_video(
             gender=(payload.gender or ""),
             video_url=str(payload.video_url),
             thumbnail_url=str(payload.thumbnail_url),
+            duration_seconds=payload.duration_seconds,
         )
         db.add(new_video)
         db.commit()
@@ -263,6 +264,8 @@ def update_video(
             video.video_url = str(payload.video_url)
         if payload.thumbnail_url is not None:
             video.thumbnail_url = str(payload.thumbnail_url)
+        if payload.duration_seconds is not None:
+            video.duration_seconds = payload.duration_seconds
 
         db.commit()
         db.refresh(video)

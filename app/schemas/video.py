@@ -1,6 +1,6 @@
 from enum import Enum
 from datetime import datetime
-from pydantic import BaseModel, AnyHttpUrl, field_validator
+from pydantic import BaseModel, AnyHttpUrl, Field, field_validator
 
 
 class GenderEnum(str, Enum):
@@ -26,6 +26,7 @@ class VideoCreateRequest(BaseModel):
     description: str | None = None
     video_url: AnyHttpUrl
     thumbnail_url: AnyHttpUrl
+    duration_seconds: int | None = Field(None, gt=0)
 
     @field_validator("body_part")
     @classmethod
@@ -55,6 +56,7 @@ class VideoUpdateRequest(BaseModel):
     description: str | None = None
     video_url: AnyHttpUrl | None = None
     thumbnail_url: AnyHttpUrl | None = None
+    duration_seconds: int | None = Field(None, gt=0)
 
     @field_validator("body_part")
     @classmethod
@@ -85,6 +87,7 @@ class VideoResponse(BaseModel):
     gender: str
     video_url: str
     thumbnail_url: str
+    duration_seconds: int | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

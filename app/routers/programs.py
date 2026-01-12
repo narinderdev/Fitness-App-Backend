@@ -39,6 +39,16 @@ def _normalize_slug(slug: str) -> str:
     return slug.strip().lower().replace(" ", "-")
 
 
+def _duration_from_video(video: Video | None) -> int | None:
+    if video is None:
+        return None
+    seconds = getattr(video, "duration_seconds", None)
+    if not seconds:
+        return None
+    minutes = int(seconds // 60)
+    return minutes if minutes >= 1 else None
+
+
 def _resolve_slug_candidate(slug: str | None, fallback_title: str | None = None) -> str:
     base = _normalize_slug(slug or "")
     if base:
@@ -140,7 +150,11 @@ def _day_payload(day: ProgramDay, completed_at: datetime | None = None) -> dict:
             title=getattr(day.video, "title", None),
             thumbnail_url=getattr(day.video, "thumbnail_url", None),
             video_url=getattr(day.video, "video_url", None),
+            duration_seconds=getattr(day.video, "duration_seconds", None),
         )
+    duration_minutes = day.duration_minutes
+    if duration_minutes is None:
+        duration_minutes = _duration_from_video(day.video)
     payload = ProgramDayResponse(
         id=day.id,
         program_id=day.program_id,
@@ -150,7 +164,7 @@ def _day_payload(day: ProgramDay, completed_at: datetime | None = None) -> dict:
         description=day.description,
         is_rest_day=day.is_rest_day,
         workout_summary=day.workout_summary,
-        duration_minutes=day.duration_minutes,
+        duration_minutes=duration_minutes,
         video_id=day.video_id,
         tips=day.tips,
         created_at=day.created_at,

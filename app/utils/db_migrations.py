@@ -206,3 +206,33 @@ def ensure_legal_links_subscription_column(engine: Engine) -> None:
                     """
                 )
             )
+
+
+def ensure_video_duration_column(engine: Engine) -> None:
+    inspector = inspect(engine)
+    if "videos" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("videos")}
+    if "duration_seconds" in columns:
+        return
+
+    with engine.begin() as connection:
+        if engine.dialect.name == "postgresql":
+            connection.execute(
+                text(
+                    """
+                    ALTER TABLE videos
+                    ADD COLUMN IF NOT EXISTS duration_seconds INTEGER
+                    """
+                )
+            )
+        else:
+            connection.execute(
+                text(
+                    """
+                    ALTER TABLE videos
+                    ADD COLUMN duration_seconds INTEGER
+                    """
+                )
+            )

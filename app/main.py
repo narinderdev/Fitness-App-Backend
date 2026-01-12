@@ -32,6 +32,7 @@ from app.utils.db_migrations import (
     ensure_user_daily_goal_column,
     ensure_legal_links_subscription_column,
     migrate_app_settings_to_legal_links,
+    ensure_video_duration_column,
 )
 from seed import run_seed
 from app.services.water_reminder_service import reminder_scheduler
@@ -62,6 +63,7 @@ async def startup_event():
     ensure_user_daily_goal_column(engine)
     migrate_app_settings_to_legal_links(engine)
     ensure_legal_links_subscription_column(engine)
+    ensure_video_duration_column(engine)
     run_seed()
     await reminder_scheduler.start()
     await progress_reminder_scheduler.start()

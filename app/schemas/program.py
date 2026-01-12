@@ -104,6 +104,7 @@ class ProgramVideoSnippet(BaseModel):
     title: str | None = None
     thumbnail_url: str | None = None
     video_url: str | None = None
+    duration_seconds: int | None = None
 
 
 class ProgramDayResponse(ProgramDayBase):

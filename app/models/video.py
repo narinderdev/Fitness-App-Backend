@@ -13,4 +13,5 @@ class Video(Base):
     gender = Column(String, nullable=False)
     video_url = Column(String, nullable=False)
     thumbnail_url = Column(String, nullable=False)
+    duration_seconds = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

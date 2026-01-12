@@ -32,6 +32,27 @@ def log_water(
         logged_at = datetime.fromisoformat(body.logged_at) if body.logged_at else datetime.utcnow()
         if logged_at.tzinfo is not None:
             logged_at = logged_at.astimezone(timezone.utc).replace(tzinfo=None)
+        if body.amount_ml < 0:
+            day = logged_at.date()
+            start = datetime.combine(day, datetime.min.time())
+            end = datetime.combine(day, datetime.max.time())
+            total = (
+                db.query(WaterLog)
+                .filter(
+                    WaterLog.user_id == current_user.id,
+                    WaterLog.logged_at >= start,
+                    WaterLog.logged_at <= end,
+                )
+                .with_entities(WaterLog.amount_ml)
+                .all()
+            )
+            amount = sum(value for (value,) in total)
+            if amount + body.amount_ml < 0:
+                return create_response(
+                    message="Water intake cannot go below zero.",
+                    data={"date": day.isoformat(), "amount_ml": amount},
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
         log = WaterLog(user_id=current_user.id, amount_ml=body.amount_ml, logged_at=logged_at)
         db.add(log)
         db.commit()

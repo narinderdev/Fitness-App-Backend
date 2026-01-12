@@ -30,6 +30,7 @@ from app.utils.db_migrations import (
     drop_food_category_slug_and_sort,
     ensure_user_flag_columns,
     ensure_user_daily_goal_column,
+    ensure_user_daily_water_goal_column,
     ensure_legal_links_subscription_column,
     migrate_app_settings_to_legal_links,
     ensure_video_duration_column,
@@ -61,6 +62,7 @@ async def startup_event():
     drop_food_category_slug_and_sort(engine)
     ensure_user_flag_columns(engine)
     ensure_user_daily_goal_column(engine)
+    ensure_user_daily_water_goal_column(engine)
     migrate_app_settings_to_legal_links(engine)
     ensure_legal_links_subscription_column(engine)
     ensure_video_duration_column(engine)

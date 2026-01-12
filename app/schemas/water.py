@@ -9,8 +9,8 @@ class WaterLogCreate(BaseModel):
     @field_validator("amount_ml")
     @classmethod
     def validate_amount(cls, value: int) -> int:
-        if value <= 0:
-            raise ValueError("amount_ml must be positive")
+        if value == 0:
+            raise ValueError("amount_ml must be non-zero")
         return value
 
     @field_validator("logged_at")

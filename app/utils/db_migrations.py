@@ -150,6 +150,45 @@ def ensure_user_daily_goal_column(engine: Engine) -> None:
             )
 
 
+def ensure_user_daily_water_goal_column(engine: Engine) -> None:
+    inspector = inspect(engine)
+    if "users" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("users")}
+    if "daily_water_goal_ml" in columns:
+        return
+
+    with engine.begin() as connection:
+        if engine.dialect.name == "postgresql":
+            connection.execute(
+                text(
+                    """
+                    ALTER TABLE users
+                    ADD COLUMN IF NOT EXISTS daily_water_goal_ml INTEGER DEFAULT 4000
+                    """
+                )
+            )
+        else:
+            # SQLite / others
+            connection.execute(
+                text(
+                    """
+                    ALTER TABLE users
+                    ADD COLUMN daily_water_goal_ml INTEGER DEFAULT 4000
+                    """
+                )
+            )
+        connection.execute(
+            text(
+                """
+                UPDATE users
+                SET daily_water_goal_ml = 4000
+                WHERE daily_water_goal_ml IS NULL
+                """
+            )
+        )
+
 def migrate_app_settings_to_legal_links(engine: Engine) -> None:
     inspector = inspect(engine)
     tables = inspector.get_table_names()

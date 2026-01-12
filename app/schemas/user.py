@@ -35,6 +35,7 @@ class ProfileUpdate(BaseModel):
     bmi_value: float | None = None
     bmi_category: str | None = None
     daily_step_goal: int | None = None
+    daily_water_goal_ml: int | None = None
 
 
 class ProfileResponse(BaseModel):
@@ -49,6 +50,7 @@ class ProfileResponse(BaseModel):
     bmi_value: float | None
     bmi_category: str | None
     daily_step_goal: int | None
+    daily_water_goal_ml: int | None
     is_active: bool
     is_admin: bool
     has_pilates_board: bool

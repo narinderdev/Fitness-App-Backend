@@ -30,6 +30,7 @@ class Settings:
         "PROGRESS_REMINDER_BODY",
         "You have {remaining} calories left to reach today's goal.",
     )
+    USDA_API_KEY = os.getenv("USDA_API_KEY")
 
     bearer_scheme = HTTPBearer()
     cors_origins = [

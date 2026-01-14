@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_
@@ -26,11 +26,14 @@ from app.schemas.nutrition import (
 from app.services.auth_middleware import get_current_admin, get_current_user
 from app.services.openfoodfacts import get_or_create_food_item
 from app.services.progress_reminder_service import calculate_target_calories, DEFAULT_BASE_CALORIES
+from app.services.nutrition_calc import calculate_macros_from_grams, derive_default_serving_grams
 from app.utils.response import create_response, handle_exception
 import httpx
 
 router = APIRouter(prefix="/nutrition", tags=["Nutrition"], dependencies=[Depends(get_current_user)])
 admin_router = APIRouter(prefix="/nutrition/admin", tags=["Nutrition Admin"], dependencies=[Depends(get_current_admin)])
+USDA_SOURCE = "USDA FoodData Central"
+ADMIN_FOOD_SOURCES = ("manual", USDA_SOURCE)
 
 
 async def _get_cached_food(db: Session, barcode: str) -> FoodItem | None:
@@ -50,11 +53,24 @@ def _serialize_food_item(item: FoodItem | None) -> dict | None:
         protein=item.protein,
         carbs=item.carbs,
         fat=item.fat,
+        food_type=item.food_type,
+        fdc_id=item.fdc_id,
+        calories_per_100g=item.calories_per_100g,
+        protein_per_100g=item.protein_per_100g,
+        carbs_per_100g=item.carbs_per_100g,
+        fat_per_100g=item.fat_per_100g,
+        default_serving_name=item.default_serving_name,
+        default_serving_grams=item.default_serving_grams,
+        density_g_per_ml=item.density_g_per_ml,
+        default_serving_ml=item.default_serving_ml,
         serving_quantity=item.serving_quantity,
         serving_unit=item.serving_unit,
+        serving_grams=item.serving_grams,
         image_url=item.image_url,
         description=item.description,
         source=item.source,
+        source_item_id=item.source_item_id,
+        last_verified_at=item.last_verified_at.isoformat() if item.last_verified_at else None,
         category_id=item.category_id,
         category_name=item.category.name if item.category else None,
         is_active=item.is_active,
@@ -102,6 +118,56 @@ def _wishlist_payload(entry: WishlistItem) -> dict:
         food_item=item_payload,
     ).model_dump()
     return payload
+
+
+def _resolve_source(payload: FoodItemAdminPayload, current_source: str | None = None) -> str:
+    if payload.source:
+        return payload.source
+    if payload.source_item_id or payload.fdc_id:
+        return USDA_SOURCE
+    return current_source or "manual"
+
+
+def _resolve_nutrition(payload: FoodItemAdminPayload) -> dict:
+    calories_per_100g = payload.calories_per_100g or 0.0
+    protein_per_100g = payload.protein_per_100g or 0.0
+    carbs_per_100g = payload.carbs_per_100g or 0.0
+    fat_per_100g = payload.fat_per_100g or 0.0
+
+    calories = payload.calories
+    protein = payload.protein
+    carbs = payload.carbs
+    fat = payload.fat
+
+    serving_grams = derive_default_serving_grams(
+        food_type=payload.food_type,
+        default_serving_grams=payload.default_serving_grams,
+        default_serving_ml=payload.default_serving_ml,
+        density_g_per_ml=payload.density_g_per_ml,
+    )
+    if serving_grams:
+        macros = calculate_macros_from_grams(
+            grams=serving_grams,
+            calories_per_100g=calories_per_100g,
+            protein_per_100g=protein_per_100g,
+            carbs_per_100g=carbs_per_100g,
+            fat_per_100g=fat_per_100g,
+        )
+        calories = macros["calories"]
+        protein = macros["protein"]
+        carbs = macros["carbs"]
+        fat = macros["fat"]
+
+    return {
+        "calories": calories,
+        "protein": protein,
+        "carbs": carbs,
+        "fat": fat,
+        "calories_per_100g": calories_per_100g,
+        "protein_per_100g": protein_per_100g,
+        "carbs_per_100g": carbs_per_100g,
+        "fat_per_100g": fat_per_100g,
+    }
 
 
 def _daily_goal_calories(db: Session, user_id: int) -> int:
@@ -402,7 +468,11 @@ def admin_list_foods(
     db: Session = Depends(get_db),
 ):
     try:
-        query = db.query(FoodItem).outerjoin(FoodCategory).filter(FoodItem.source == "manual")
+        query = (
+            db.query(FoodItem)
+            .outerjoin(FoodCategory)
+            .filter(FoodItem.source.in_(ADMIN_FOOD_SOURCES))
+        )
         if not include_inactive:
             query = query.filter(FoodItem.is_active == True)
         if category_id:
@@ -453,18 +523,42 @@ def admin_create_food(
             if not category:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
 
+        nutrition = _resolve_nutrition(payload)
+        source = _resolve_source(payload)
+        serving_grams = derive_default_serving_grams(
+            food_type=payload.food_type,
+            default_serving_grams=payload.default_serving_grams,
+            default_serving_ml=payload.default_serving_ml,
+            density_g_per_ml=payload.density_g_per_ml,
+        )
+        fdc_id = payload.fdc_id
+        if fdc_id is None and payload.source_item_id and payload.source_item_id.isdigit():
+            fdc_id = int(payload.source_item_id)
         item = FoodItem(
             product_name=payload.name.strip(),
             brand=payload.brand.strip() if payload.brand else None,
-            calories=payload.calories,
-            protein=payload.protein,
-            carbs=payload.carbs,
-            fat=payload.fat,
-            serving_quantity=payload.serving_quantity or 1.0,
-            serving_unit=payload.serving_unit or "serving",
+            calories=nutrition["calories"],
+            protein=nutrition["protein"],
+            carbs=nutrition["carbs"],
+            fat=nutrition["fat"],
+            food_type=payload.food_type,
+            fdc_id=fdc_id,
+            calories_per_100g=nutrition["calories_per_100g"],
+            protein_per_100g=nutrition["protein_per_100g"],
+            carbs_per_100g=nutrition["carbs_per_100g"],
+            fat_per_100g=nutrition["fat_per_100g"],
+            default_serving_name=payload.default_serving_name,
+            default_serving_grams=payload.default_serving_grams,
+            density_g_per_ml=payload.density_g_per_ml,
+            default_serving_ml=payload.default_serving_ml,
+            serving_quantity=1.0,
+            serving_unit=payload.default_serving_name or payload.serving_unit,
+            serving_grams=serving_grams,
             image_url=payload.image_url,
             description=payload.description,
-            source="manual",
+            source=source,
+            source_item_id=payload.source_item_id,
+            last_verified_at=datetime.utcnow() if source == USDA_SOURCE else None,
             category_id=category.id if category else None,
             is_active=payload.is_active,
         )
@@ -489,7 +583,11 @@ def admin_update_food(
     db: Session = Depends(get_db),
 ):
     try:
-        item = db.query(FoodItem).filter(FoodItem.id == food_id, FoodItem.source == "manual").first()
+        item = (
+            db.query(FoodItem)
+            .filter(FoodItem.id == food_id, FoodItem.source.in_(ADMIN_FOOD_SOURCES))
+            .first()
+        )
         if not item:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Food not found")
         if payload.category_id is not None:
@@ -500,16 +598,42 @@ def admin_update_food(
                 if not category:
                     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
                 item.category_id = category.id
+        nutrition = _resolve_nutrition(payload)
+        source = _resolve_source(payload, current_source=item.source)
+        serving_grams = derive_default_serving_grams(
+            food_type=payload.food_type,
+            default_serving_grams=payload.default_serving_grams,
+            default_serving_ml=payload.default_serving_ml,
+            density_g_per_ml=payload.density_g_per_ml,
+        )
+        fdc_id = payload.fdc_id
+        if fdc_id is None and payload.source_item_id and payload.source_item_id.isdigit():
+            fdc_id = int(payload.source_item_id)
         item.product_name = payload.name.strip()
         item.brand = payload.brand.strip() if payload.brand else None
-        item.calories = payload.calories
-        item.protein = payload.protein
-        item.carbs = payload.carbs
-        item.fat = payload.fat
-        item.serving_quantity = payload.serving_quantity or 1.0
-        item.serving_unit = payload.serving_unit or "serving"
+        item.calories = nutrition["calories"]
+        item.protein = nutrition["protein"]
+        item.carbs = nutrition["carbs"]
+        item.fat = nutrition["fat"]
+        item.food_type = payload.food_type
+        item.fdc_id = fdc_id
+        item.calories_per_100g = nutrition["calories_per_100g"]
+        item.protein_per_100g = nutrition["protein_per_100g"]
+        item.carbs_per_100g = nutrition["carbs_per_100g"]
+        item.fat_per_100g = nutrition["fat_per_100g"]
+        item.default_serving_name = payload.default_serving_name
+        item.default_serving_grams = payload.default_serving_grams
+        item.density_g_per_ml = payload.density_g_per_ml
+        item.default_serving_ml = payload.default_serving_ml
+        item.serving_quantity = 1.0
+        item.serving_unit = payload.default_serving_name or payload.serving_unit
+        item.serving_grams = serving_grams
         item.image_url = payload.image_url
         item.description = payload.description
+        item.source = source
+        item.source_item_id = payload.source_item_id or item.source_item_id
+        if source == USDA_SOURCE:
+            item.last_verified_at = datetime.utcnow()
         item.is_active = payload.is_active
         db.commit()
         db.refresh(item)
@@ -530,7 +654,11 @@ def admin_delete_food(
     db: Session = Depends(get_db),
 ):
     try:
-        item = db.query(FoodItem).filter(FoodItem.id == food_id, FoodItem.source == "manual").first()
+        item = (
+            db.query(FoodItem)
+            .filter(FoodItem.id == food_id, FoodItem.source.in_(ADMIN_FOOD_SOURCES))
+            .first()
+        )
         if not item:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Food not found")
         db.query(FoodLog).filter(FoodLog.food_item_id == food_id).update(
@@ -563,7 +691,7 @@ def list_manual_foods(
             db.query(FoodItem)
             .outerjoin(FoodCategory)
             .filter(
-                FoodItem.source == "manual",
+                FoodItem.source.in_(ADMIN_FOOD_SOURCES),
                 FoodItem.is_active == True,
             )
         )

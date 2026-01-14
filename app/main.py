@@ -16,6 +16,7 @@ from app.routers import (
     profile,
     questions,
     subscription_plans,
+    products,
     users,
     exercise_library,
     videos,
@@ -23,6 +24,7 @@ from app.routers import (
     weight,
     progress_photos,
     legal_links,
+    usda,
 )
 from app.utils.response import create_response, handle_exception
 from app.utils.db_migrations import (
@@ -31,9 +33,11 @@ from app.utils.db_migrations import (
     ensure_user_flag_columns,
     ensure_user_daily_goal_column,
     ensure_user_daily_water_goal_column,
+    ensure_food_item_usda_columns,
     ensure_legal_links_subscription_column,
     migrate_app_settings_to_legal_links,
     ensure_video_duration_column,
+    drop_products_key_column,
 )
 from seed import run_seed
 from app.services.water_reminder_service import reminder_scheduler
@@ -63,9 +67,11 @@ async def startup_event():
     ensure_user_flag_columns(engine)
     ensure_user_daily_goal_column(engine)
     ensure_user_daily_water_goal_column(engine)
+    ensure_food_item_usda_columns(engine)
     migrate_app_settings_to_legal_links(engine)
     ensure_legal_links_subscription_column(engine)
     ensure_video_duration_column(engine)
+    drop_products_key_column(engine)
     run_seed()
     await reminder_scheduler.start()
     await progress_reminder_scheduler.start()
@@ -91,10 +97,13 @@ app.include_router(water.router)
 app.include_router(weight.router)
 app.include_router(analytics.router)
 app.include_router(subscription_plans.router)
+app.include_router(products.router)
+app.include_router(products.admin_router)
 app.include_router(programs.router)
 app.include_router(exercise_library.router)
 app.include_router(progress_photos.router)
 app.include_router(legal_links.router)
+app.include_router(usda.router)
 
 # Serve uploaded assets
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")

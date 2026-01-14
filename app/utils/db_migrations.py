@@ -189,6 +189,65 @@ def ensure_user_daily_water_goal_column(engine: Engine) -> None:
             )
         )
 
+
+def ensure_food_item_usda_columns(engine: Engine) -> None:
+    inspector = inspect(engine)
+    if "food_items" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("food_items")}
+    float_columns = [
+        "serving_grams",
+        "calories_per_100g",
+        "protein_per_100g",
+        "carbs_per_100g",
+        "fat_per_100g",
+        "default_serving_grams",
+        "density_g_per_ml",
+        "default_serving_ml",
+    ]
+    string_columns = ["source_item_id", "food_type", "default_serving_name"]
+    datetime_columns = ["last_verified_at"]
+    integer_columns = ["fdc_id"]
+
+    with engine.begin() as connection:
+        for column in float_columns:
+            if column in columns:
+                continue
+            if engine.dialect.name == "postgresql":
+                connection.execute(
+                    text(f"ALTER TABLE food_items ADD COLUMN IF NOT EXISTS {column} FLOAT")
+                )
+            else:
+                connection.execute(text(f"ALTER TABLE food_items ADD COLUMN {column} FLOAT"))
+        for column in string_columns:
+            if column in columns:
+                continue
+            if engine.dialect.name == "postgresql":
+                connection.execute(
+                    text(f"ALTER TABLE food_items ADD COLUMN IF NOT EXISTS {column} VARCHAR")
+                )
+            else:
+                connection.execute(text(f"ALTER TABLE food_items ADD COLUMN {column} VARCHAR"))
+        for column in datetime_columns:
+            if column in columns:
+                continue
+            if engine.dialect.name == "postgresql":
+                connection.execute(
+                    text(f"ALTER TABLE food_items ADD COLUMN IF NOT EXISTS {column} TIMESTAMP")
+                )
+            else:
+                connection.execute(text(f"ALTER TABLE food_items ADD COLUMN {column} DATETIME"))
+        for column in integer_columns:
+            if column in columns:
+                continue
+            if engine.dialect.name == "postgresql":
+                connection.execute(
+                    text(f"ALTER TABLE food_items ADD COLUMN IF NOT EXISTS {column} INTEGER")
+                )
+            else:
+                connection.execute(text(f"ALTER TABLE food_items ADD COLUMN {column} INTEGER"))
+
 def migrate_app_settings_to_legal_links(engine: Engine) -> None:
     inspector = inspect(engine)
     tables = inspector.get_table_names()
@@ -275,3 +334,56 @@ def ensure_video_duration_column(engine: Engine) -> None:
                     """
                 )
             )
+
+
+def drop_products_key_column(engine: Engine) -> None:
+    inspector = inspect(engine)
+    if "products" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("products")}
+    if "key" not in columns:
+        return
+
+    if engine.dialect.name == "sqlite":
+        with engine.connect() as connection:
+            connection.execute(text("PRAGMA foreign_keys=OFF"))
+            trans = connection.begin()
+            try:
+                connection.execute(text("ALTER TABLE products RENAME TO products_old"))
+                connection.execute(
+                    text(
+                        "CREATE TABLE products ("
+                        "id INTEGER PRIMARY KEY, "
+                        "title VARCHAR NOT NULL, "
+                        "subtitle VARCHAR, "
+                        "badge_text VARCHAR, "
+                        "description TEXT, "
+                        "image_url VARCHAR, "
+                        "is_active BOOLEAN NOT NULL DEFAULT 1, "
+                        "sort_order INTEGER NOT NULL DEFAULT 0, "
+                        "created_at DATETIME NOT NULL, "
+                        "updated_at DATETIME NOT NULL"
+                        ")"
+                    )
+                )
+                connection.execute(
+                    text(
+                        "INSERT INTO products "
+                        "(id, title, subtitle, badge_text, description, image_url, "
+                        "is_active, sort_order, created_at, updated_at) "
+                        "SELECT id, title, subtitle, badge_text, description, image_url, "
+                        "is_active, sort_order, created_at, updated_at "
+                        "FROM products_old"
+                    )
+                )
+                connection.execute(text("DROP TABLE products_old"))
+                trans.commit()
+            except Exception:
+                trans.rollback()
+                raise
+            finally:
+                connection.execute(text("PRAGMA foreign_keys=ON"))
+        return
+
+    with engine.begin() as connection:
+        connection.execute(text("ALTER TABLE products DROP COLUMN IF EXISTS key"))

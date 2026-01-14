@@ -219,68 +219,7 @@ DEFAULT_GOAL_QUESTIONS = [
     },
 ]
 
-DEFAULT_FOODS = [
-    {
-        "name": "Apple",
-        "category_name": "Fruits",
-        "calories": 95,
-        "protein": 0.5,
-        "carbs": 25,
-        "fat": 0.3,
-        "serving_quantity": 1,
-        "serving_unit": "medium (182g)",
-    },
-    {
-        "name": "Banana",
-        "category_name": "Fruits",
-        "calories": 105,
-        "protein": 1.3,
-        "carbs": 27,
-        "fat": 0.3,
-        "serving_quantity": 1,
-        "serving_unit": "medium (118g)",
-    },
-    {
-        "name": "Baby Spinach",
-        "category_name": "Vegetables",
-        "calories": 20,
-        "protein": 2.0,
-        "carbs": 3.4,
-        "fat": 0.3,
-        "serving_quantity": 2,
-        "serving_unit": "cups (raw)",
-    },
-    {
-        "name": "Grilled Chicken Breast",
-        "category_name": "Proteins",
-        "calories": 165,
-        "protein": 31,
-        "carbs": 0,
-        "fat": 3.6,
-        "serving_quantity": 1,
-        "serving_unit": "serving (113g)",
-    },
-    {
-        "name": "Quinoa (cooked)",
-        "category_name": "Grains",
-        "calories": 222,
-        "protein": 8,
-        "carbs": 39,
-        "fat": 3.6,
-        "serving_quantity": 1,
-        "serving_unit": "cup",
-    },
-    {
-        "name": "Almond Butter",
-        "category_name": "Snacks",
-        "calories": 98,
-        "fat": 9,
-        "protein": 3.4,
-        "carbs": 3.4,
-        "serving_quantity": 1,
-        "serving_unit": "tablespoon",
-    },
-]
+DEFAULT_FOODS = []
 
 # Load environment variables
 load_dotenv()

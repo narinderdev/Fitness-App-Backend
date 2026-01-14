@@ -2,7 +2,7 @@ from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
 from app.models.nutrition import FoodItem, FoodLog, FoodCategory, MealConfig, WishlistItem
@@ -80,19 +80,22 @@ def _log_payload(log: FoodLog) -> dict:
 
 
 def _wishlist_payload(entry: WishlistItem) -> dict:
-    item_payload = FoodItemResponse(
-        id=entry.food_item_id,
-        barcode=entry.barcode,
-        product_name=entry.product_name,
-        brand=entry.brand,
-        calories=entry.calories,
-        protein=entry.protein,
-        carbs=entry.carbs,
-        fat=entry.fat,
-        serving_quantity=entry.serving_quantity,
-        serving_unit=entry.serving_unit,
-        image_url=entry.image_url,
-    ).model_dump()
+    if entry.food_item:
+        item_payload = _serialize_food_item(entry.food_item)
+    else:
+        item_payload = FoodItemResponse(
+            id=entry.food_item_id,
+            barcode=entry.barcode,
+            product_name=entry.product_name,
+            brand=entry.brand,
+            calories=entry.calories,
+            protein=entry.protein,
+            carbs=entry.carbs,
+            fat=entry.fat,
+            serving_quantity=entry.serving_quantity,
+            serving_unit=entry.serving_unit,
+            image_url=entry.image_url,
+        ).model_dump()
     payload = WishlistItemResponse(
         id=entry.id,
         created_at=entry.created_at.isoformat(),
@@ -640,6 +643,7 @@ def list_wishlist(
     try:
         items = (
             db.query(WishlistItem)
+            .options(selectinload(WishlistItem.food_item))
             .filter(WishlistItem.user_id == current_user.id)
             .order_by(WishlistItem.created_at.desc())
             .all()

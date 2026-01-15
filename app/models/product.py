@@ -14,6 +14,7 @@ class Product(Base):
     badge_text = Column(String, nullable=True)
     description = Column(Text, nullable=True)
     image_url = Column(String, nullable=True)
+    link_url = Column(String, nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     sort_order = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

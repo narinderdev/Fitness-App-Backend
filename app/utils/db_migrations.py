@@ -119,6 +119,36 @@ def ensure_user_flag_columns(engine: Engine) -> None:
                 )
 
 
+def ensure_user_health_ack_column(engine: Engine) -> None:
+    inspector = inspect(engine)
+    if "users" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("users")}
+    if "health_data_acknowledged" in columns:
+        return
+
+    with engine.begin() as connection:
+        if engine.dialect.name == "postgresql":
+            connection.execute(
+                text(
+                    """
+                    ALTER TABLE users
+                    ADD COLUMN IF NOT EXISTS health_data_acknowledged BOOLEAN DEFAULT FALSE
+                    """
+                )
+            )
+        else:
+            connection.execute(
+                text(
+                    """
+                    ALTER TABLE users
+                    ADD COLUMN health_data_acknowledged BOOLEAN DEFAULT 0
+                    """
+                )
+            )
+
+
 def ensure_user_daily_goal_column(engine: Engine) -> None:
     inspector = inspect(engine)
     if "users" not in inspector.get_table_names():
@@ -359,6 +389,7 @@ def drop_products_key_column(engine: Engine) -> None:
                         "badge_text VARCHAR, "
                         "description TEXT, "
                         "image_url VARCHAR, "
+                        "link_url VARCHAR, "
                         "is_active BOOLEAN NOT NULL DEFAULT 1, "
                         "sort_order INTEGER NOT NULL DEFAULT 0, "
                         "created_at DATETIME NOT NULL, "
@@ -369,9 +400,9 @@ def drop_products_key_column(engine: Engine) -> None:
                 connection.execute(
                     text(
                         "INSERT INTO products "
-                        "(id, title, subtitle, badge_text, description, image_url, "
+                        "(id, title, subtitle, badge_text, description, image_url, link_url, "
                         "is_active, sort_order, created_at, updated_at) "
-                        "SELECT id, title, subtitle, badge_text, description, image_url, "
+                        "SELECT id, title, subtitle, badge_text, description, image_url, link_url, "
                         "is_active, sort_order, created_at, updated_at "
                         "FROM products_old"
                     )
@@ -387,3 +418,32 @@ def drop_products_key_column(engine: Engine) -> None:
 
     with engine.begin() as connection:
         connection.execute(text("ALTER TABLE products DROP COLUMN IF EXISTS key"))
+
+
+def ensure_product_link_column(engine: Engine) -> None:
+    inspector = inspect(engine)
+    if "products" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("products")}
+    if "link_url" in columns:
+        return
+
+    with engine.begin() as connection:
+        if engine.dialect.name == "postgresql":
+            connection.execute(
+                text(
+                    """
+                    ALTER TABLE products
+                    ADD COLUMN IF NOT EXISTS link_url VARCHAR
+                    """
+                )
+            )
+        else:
+            connection.execute(
+                text(
+                    """
+                    ALTER TABLE products
+                    ADD COLUMN link_url VARCHAR
+                    """
+                )
+            )

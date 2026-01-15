@@ -17,10 +17,10 @@ from app.schemas.video import (
     GenderEnum,
     VideoCreateRequest,
     VideoUpdateRequest,
+    normalize_body_part,
 )
 from app.services.spaces_service import (
     get_videos_by_category,
-    normalize_category,
 )
 from app.utils.response import create_response, handle_exception
 
@@ -37,8 +37,8 @@ CATEGORY_DB_ALIASES = {
     "Arms": ["Arms", "NewArms"],
     "FullBody": ["FullBody", "NewFullBody"],
     "Legs": ["Legs", "NewLegs"],
-    "FullBodyStrength": ["FullBodyStrength"],
-    "SportNutrition": ["SportNutrition"],
+    "FREE WORKOUT #1": ["FREE WORKOUT #1", "FullBodyStrength"],
+    "FREE WORKOUT #2": ["FREE WORKOUT #2", "SportNutrition"],
 }
 DEFAULT_PAGE_SIZE = 20
 MAX_PAGE_SIZE = 100
@@ -52,10 +52,12 @@ PLAN_VIDEO_PATH_TOKENS = (
 
 
 def _resolve_category(category: str) -> str | None:
-    normalized = normalize_category(category)
-    if not normalized and category in BODY_PART_VALUES:
-        normalized = category
-    return normalized
+    if not category:
+        return None
+    normalized = normalize_body_part(category)
+    if normalized in BODY_PART_VALUES:
+        return normalized
+    return None
 
 
 def _db_values_for_category(category: str) -> list[str]:
@@ -94,8 +96,8 @@ def _category_key(value: str | None) -> str:
     mapped = _CATEGORY_ALIAS_LOOKUP.get(normalized)
     if mapped:
         return mapped
-    normalized_from_slug = normalize_category(raw)
-    if normalized_from_slug:
+    normalized_from_slug = normalize_body_part(raw)
+    if normalized_from_slug in BODY_PART_VALUES:
         return normalized_from_slug
     return raw
 

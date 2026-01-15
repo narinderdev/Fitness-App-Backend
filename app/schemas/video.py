@@ -1,5 +1,6 @@
 from enum import Enum
 from datetime import datetime
+import re
 from pydantic import BaseModel, AnyHttpUrl, Field, field_validator
 
 
@@ -15,8 +16,36 @@ class BodyPartEnum(str, Enum):
     arms = "Arms"
     full_body = "FullBody"
     legs = "Legs"
-    full_body_strength = "FullBodyStrength"
-    sport_nutrition = "SportNutrition"
+    free_workout_1 = "FREE WORKOUT #1"
+    free_workout_2 = "FREE WORKOUT #2"
+
+
+BODY_PART_ALIASES = {
+    "core": "Core",
+    "arms": "Arms",
+    "fullbody": "FullBody",
+    "legs": "Legs",
+    "fullbodystrength": "FREE WORKOUT #1",
+    "fullbodystregth": "FREE WORKOUT #1",
+    "sportnutrition": "FREE WORKOUT #2",
+    "sportsnutrition": "FREE WORKOUT #2",
+    "newcore": "Core",
+    "newarms": "Arms",
+    "newfullbody": "FullBody",
+    "newlegs": "Legs",
+    "freeworkout1": "FREE WORKOUT #1",
+    "freeworkout2": "FREE WORKOUT #2",
+}
+
+
+def normalize_body_part(value: str | None) -> str | None:
+    if value in (None, ""):
+        return value
+    value_text = str(value)
+    key = re.sub(r"[^a-z0-9]", "", value_text.lower())
+    if not key:
+        return value_text
+    return BODY_PART_ALIASES.get(key, value_text)
 
 
 class VideoCreateRequest(BaseModel):
@@ -33,10 +62,11 @@ class VideoCreateRequest(BaseModel):
     def validate_body_part(cls, value: str | None) -> str:
         if value in (None, ""):
             return ""
+        normalized = normalize_body_part(value)
         allowed = {item.value for item in BodyPartEnum}
-        if value not in allowed:
-            raise ValueError("Input should be 'Core', 'Arms', 'FullBody', 'Legs', 'FullBodyStrength' or 'SportNutrition'")
-        return value
+        if normalized not in allowed:
+            raise ValueError("Input should be 'Core', 'Arms', 'FullBody', 'Legs', 'FREE WORKOUT #1' or 'FREE WORKOUT #2'")
+        return normalized
 
     @field_validator("gender")
     @classmethod
@@ -63,10 +93,11 @@ class VideoUpdateRequest(BaseModel):
     def validate_body_part(cls, value: str | None) -> str | None:
         if value in (None, ""):
             return "" if value == "" else None
+        normalized = normalize_body_part(value)
         allowed = {item.value for item in BodyPartEnum}
-        if value not in allowed:
-            raise ValueError("Input should be 'Core', 'Arms', 'FullBody', 'Legs', 'FullBodyStrength' or 'SportNutrition'")
-        return value
+        if normalized not in allowed:
+            raise ValueError("Input should be 'Core', 'Arms', 'FullBody', 'Legs', 'FREE WORKOUT #1' or 'FREE WORKOUT #2'")
+        return normalized
 
     @field_validator("gender")
     @classmethod

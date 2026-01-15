@@ -10,6 +10,7 @@ class ProductResponse(BaseModel):
     badge_text: str | None = None
     description: str | None = None
     image_url: str | None = None
+    link_url: str | None = None
     is_active: bool
     sort_order: int
     created_at: datetime | None = None
@@ -24,6 +25,7 @@ class ProductCreate(BaseModel):
     badge_text: str | None = None
     description: str | None = None
     image_url: str | None = None
+    link_url: str | None = None
     is_active: bool = True
     sort_order: int = 0
 
@@ -34,5 +36,6 @@ class ProductUpdate(BaseModel):
     badge_text: str | None = None
     description: str | None = None
     image_url: str | None = None
+    link_url: str | None = None
     is_active: bool | None = None
     sort_order: int | None = None

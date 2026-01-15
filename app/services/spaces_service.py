@@ -1,5 +1,6 @@
 import boto3
 import os
+import re
 
 session = boto3.session.Session()
 
@@ -30,12 +31,14 @@ CATEGORY_MAP = {
     "fullbodystregth": "FullBodyStrength",
     "sportnutrition": "SportNutrition",
     "sportsnutrition": "SportNutrition",
+    "freeworkout1": "FullBodyStrength",
+    "freeworkout2": "SportNutrition",
 }
 
 
 def normalize_category(cat: str):
     """Convert user category to correct folder name"""
-    key = cat.replace(" ", "").replace("-", "").lower()
+    key = re.sub(r"[^a-z0-9]", "", cat.lower())
     return CATEGORY_MAP.get(key)
 
 

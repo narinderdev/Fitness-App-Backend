@@ -31,6 +31,7 @@ from app.utils.db_migrations import (
     ensure_program_price_column,
     drop_food_category_slug_and_sort,
     ensure_user_flag_columns,
+    ensure_user_health_ack_column,
     ensure_user_daily_goal_column,
     ensure_user_daily_water_goal_column,
     ensure_food_item_usda_columns,
@@ -38,6 +39,7 @@ from app.utils.db_migrations import (
     migrate_app_settings_to_legal_links,
     ensure_video_duration_column,
     drop_products_key_column,
+    ensure_product_link_column,
 )
 from seed import run_seed
 from app.services.water_reminder_service import reminder_scheduler
@@ -65,6 +67,7 @@ async def startup_event():
     ensure_program_price_column(engine)
     drop_food_category_slug_and_sort(engine)
     ensure_user_flag_columns(engine)
+    ensure_user_health_ack_column(engine)
     ensure_user_daily_goal_column(engine)
     ensure_user_daily_water_goal_column(engine)
     ensure_food_item_usda_columns(engine)
@@ -72,6 +75,7 @@ async def startup_event():
     ensure_legal_links_subscription_column(engine)
     ensure_video_duration_column(engine)
     drop_products_key_column(engine)
+    ensure_product_link_column(engine)
     run_seed()
     await reminder_scheduler.start()
     await progress_reminder_scheduler.start()

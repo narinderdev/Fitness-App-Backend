@@ -34,6 +34,7 @@ from app.utils.db_migrations import (
     ensure_user_health_ack_column,
     ensure_user_daily_goal_column,
     ensure_user_daily_water_goal_column,
+    ensure_user_tracking_reminder_columns,
     ensure_food_item_usda_columns,
     ensure_legal_links_subscription_column,
     migrate_app_settings_to_legal_links,
@@ -44,6 +45,7 @@ from app.utils.db_migrations import (
 from seed import run_seed
 from app.services.water_reminder_service import reminder_scheduler
 from app.services.progress_reminder_service import progress_reminder_scheduler
+from app.services.tracking_reminder_service import tracking_reminder_scheduler
 
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key=settings.JWT_SECRET)
@@ -70,6 +72,7 @@ async def startup_event():
     ensure_user_health_ack_column(engine)
     ensure_user_daily_goal_column(engine)
     ensure_user_daily_water_goal_column(engine)
+    ensure_user_tracking_reminder_columns(engine)
     ensure_food_item_usda_columns(engine)
     migrate_app_settings_to_legal_links(engine)
     ensure_legal_links_subscription_column(engine)
@@ -79,12 +82,14 @@ async def startup_event():
     run_seed()
     await reminder_scheduler.start()
     await progress_reminder_scheduler.start()
+    await tracking_reminder_scheduler.start()
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
     await reminder_scheduler.stop()
     await progress_reminder_scheduler.stop()
+    await tracking_reminder_scheduler.stop()
 
 # Add routes
 app.include_router(auth.router)

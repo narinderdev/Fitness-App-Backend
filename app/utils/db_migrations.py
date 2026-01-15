@@ -220,6 +220,42 @@ def ensure_user_daily_water_goal_column(engine: Engine) -> None:
         )
 
 
+def ensure_user_tracking_reminder_columns(engine: Engine) -> None:
+    inspector = inspect(engine)
+    if "users" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("users")}
+    reminder_columns = [
+        "last_weight_reminder_at",
+        "last_progress_photo_reminder_at",
+    ]
+    missing_columns = [column for column in reminder_columns if column not in columns]
+    if not missing_columns:
+        return
+
+    with engine.begin() as connection:
+        for column in missing_columns:
+            if engine.dialect.name == "postgresql":
+                connection.execute(
+                    text(
+                        f"""
+                        ALTER TABLE users
+                        ADD COLUMN IF NOT EXISTS {column} TIMESTAMP
+                        """
+                    )
+                )
+            else:
+                connection.execute(
+                    text(
+                        f"""
+                        ALTER TABLE users
+                        ADD COLUMN {column} DATETIME
+                        """
+                    )
+                )
+
+
 def ensure_food_item_usda_columns(engine: Engine) -> None:
     inspector = inspect(engine)
     if "food_items" not in inspector.get_table_names():

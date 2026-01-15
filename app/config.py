@@ -30,6 +30,25 @@ class Settings:
         "PROGRESS_REMINDER_BODY",
         "You have {remaining} calories left to reach today's goal.",
     )
+    TRACKING_REMINDER_INTERVAL_MINUTES = int(
+        os.getenv("TRACKING_REMINDER_INTERVAL_MINUTES", 1440)
+    )
+    TRACKING_REMINDER_AUTO_ENABLED = (
+        os.getenv("TRACKING_REMINDER_AUTO_ENABLED", "true").lower() == "true"
+    )
+    WEIGHT_REMINDER_TITLE = os.getenv("WEIGHT_REMINDER_TITLE", "Time to log your weight")
+    WEIGHT_REMINDER_BODY = os.getenv(
+        "WEIGHT_REMINDER_BODY",
+        "It's time for your weekly weigh-in.",
+    )
+    PROGRESS_PHOTO_REMINDER_TITLE = os.getenv(
+        "PROGRESS_PHOTO_REMINDER_TITLE",
+        "Progress photo reminder",
+    )
+    PROGRESS_PHOTO_REMINDER_BODY = os.getenv(
+        "PROGRESS_PHOTO_REMINDER_BODY",
+        "Snap a quick progress photo to track your journey.",
+    )
     USDA_API_KEY = os.getenv("USDA_API_KEY")
 
     bearer_scheme = HTTPBearer()

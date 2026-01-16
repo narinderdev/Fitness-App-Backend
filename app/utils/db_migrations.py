@@ -90,6 +90,7 @@ def ensure_user_flag_columns(engine: Engine) -> None:
     flag_columns = [
         "has_pilates_board",
         "has_ankle_wrist_weights",
+        "purchased_plan",
     ]
 
     missing_columns = [column for column in flag_columns if column not in columns]

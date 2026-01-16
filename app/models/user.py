@@ -34,5 +34,6 @@ class User(Base):
     # Purchase flags
     has_pilates_board = Column(Boolean, default=False, nullable=False)
     has_ankle_wrist_weights = Column(Boolean, default=False, nullable=False)
+    purchased_plan = Column(Boolean, default=False, nullable=False)
     last_weight_reminder_at = Column(DateTime, nullable=True)
     last_progress_photo_reminder_at = Column(DateTime, nullable=True)

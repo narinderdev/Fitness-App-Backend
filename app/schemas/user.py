@@ -14,12 +14,14 @@ class RequestOtp(BaseModel):
     email: EmailStr
     is_admin: bool = False
     platform: PlatformEnum = PlatformEnum.app
+    referral_code: str | None = None
 
 class VerifyOtp(BaseModel):
     email: EmailStr
     otp: str
     is_admin: bool = False
     platform: PlatformEnum = PlatformEnum.app
+    referral_code: str | None = None
 
 
 class RefreshTokenRequest(BaseModel):
@@ -58,6 +60,7 @@ class ProfileResponse(BaseModel):
     has_pilates_board: bool
     has_ankle_wrist_weights: bool
     purchased_plan: bool
+    referral_code: str | None = None
 
     model_config = {"from_attributes": True}
 

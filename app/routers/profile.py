@@ -12,6 +12,7 @@ from app.models.water import DeviceToken, WaterLog
 from app.schemas.user import ProfileResponse, ProfileUpdate
 from app.services.auth_middleware import get_current_user
 from app.services.bmi_service import recalculate_user_bmi
+from app.services.referral_service import ensure_referral_code
 from app.utils.response import create_response, handle_exception
 
 router = APIRouter(prefix="/profile", tags=["Profile"])
@@ -34,6 +35,11 @@ def get_profile(
             if bmi_payload is not None:
                 db.commit()
                 db.refresh(user)
+
+        if not user.referral_code:
+            ensure_referral_code(db, user)
+            db.commit()
+            db.refresh(user)
 
         profile_payload = ProfileResponse.model_validate(user).model_dump()
         return create_response(

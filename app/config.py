@@ -49,6 +49,15 @@ class Settings:
         "PROGRESS_PHOTO_REMINDER_BODY",
         "Snap a quick progress photo to track your journey.",
     )
+    REFERRAL_COUPON_CODE = os.getenv("REFERRAL_COUPON_CODE", "FRIEND10")
+    REFERRAL_NOTIFICATION_TITLE = os.getenv(
+        "REFERRAL_NOTIFICATION_TITLE",
+        "You earned a reward!",
+    )
+    REFERRAL_NOTIFICATION_BODY = os.getenv(
+        "REFERRAL_NOTIFICATION_BODY",
+        "Thanks for inviting a friend! Use code {code} to save.",
+    )
     USDA_API_KEY = os.getenv("USDA_API_KEY")
 
     bearer_scheme = HTTPBearer()

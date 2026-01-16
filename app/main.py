@@ -25,6 +25,8 @@ from app.routers import (
     progress_photos,
     legal_links,
     usda,
+    referrals,
+    notifications,
 )
 from app.utils.response import create_response, handle_exception
 from app.utils.db_migrations import (
@@ -35,6 +37,7 @@ from app.utils.db_migrations import (
     ensure_user_daily_goal_column,
     ensure_user_daily_water_goal_column,
     ensure_user_tracking_reminder_columns,
+    ensure_user_referral_columns,
     ensure_food_item_usda_columns,
     ensure_legal_links_subscription_column,
     migrate_app_settings_to_legal_links,
@@ -73,6 +76,7 @@ async def startup_event():
     ensure_user_daily_goal_column(engine)
     ensure_user_daily_water_goal_column(engine)
     ensure_user_tracking_reminder_columns(engine)
+    ensure_user_referral_columns(engine)
     ensure_food_item_usda_columns(engine)
     migrate_app_settings_to_legal_links(engine)
     ensure_legal_links_subscription_column(engine)
@@ -113,6 +117,8 @@ app.include_router(exercise_library.router)
 app.include_router(progress_photos.router)
 app.include_router(legal_links.router)
 app.include_router(usda.router)
+app.include_router(referrals.router)
+app.include_router(notifications.router)
 
 # Serve uploaded assets
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")

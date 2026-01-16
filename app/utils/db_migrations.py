@@ -257,6 +257,67 @@ def ensure_user_tracking_reminder_columns(engine: Engine) -> None:
                 )
 
 
+def ensure_user_referral_columns(engine: Engine) -> None:
+    inspector = inspect(engine)
+    if "users" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("users")}
+    referral_columns = {
+        "referral_code": "VARCHAR",
+        "referred_by_id": "INTEGER",
+        "referral_reward_sent": "BOOLEAN",
+    }
+    missing_columns = {
+        column: dtype
+        for column, dtype in referral_columns.items()
+        if column not in columns
+    }
+    if not missing_columns:
+        return
+
+    with engine.begin() as connection:
+        for column, dtype in missing_columns.items():
+            if column == "referral_reward_sent":
+                if engine.dialect.name == "postgresql":
+                    connection.execute(
+                        text(
+                            f"""
+                            ALTER TABLE users
+                            ADD COLUMN IF NOT EXISTS {column} BOOLEAN DEFAULT FALSE
+                            """
+                        )
+                    )
+                else:
+                    connection.execute(
+                        text(
+                            f"""
+                            ALTER TABLE users
+                            ADD COLUMN {column} BOOLEAN DEFAULT 0
+                            """
+                        )
+                    )
+            else:
+                if engine.dialect.name == "postgresql":
+                    connection.execute(
+                        text(
+                            f"""
+                            ALTER TABLE users
+                            ADD COLUMN IF NOT EXISTS {column} {dtype}
+                            """
+                        )
+                    )
+                else:
+                    connection.execute(
+                        text(
+                            f"""
+                            ALTER TABLE users
+                            ADD COLUMN {column} {dtype}
+                            """
+                        )
+                    )
+
+
 def ensure_food_item_usda_columns(engine: Engine) -> None:
     inspector = inspect(engine)
     if "food_items" not in inspector.get_table_names():

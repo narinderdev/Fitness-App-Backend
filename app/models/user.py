@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, Float, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, Float, DateTime, ForeignKey
 from app.database import Base
 
 class User(Base):
@@ -30,6 +30,11 @@ class User(Base):
 
     # Admin flag
     is_admin = Column(Boolean, default=False, nullable=False)
+
+    # Referrals
+    referral_code = Column(String, unique=True, index=True, nullable=True)
+    referred_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    referral_reward_sent = Column(Boolean, default=False, nullable=False)
 
     # Purchase flags
     has_pilates_board = Column(Boolean, default=False, nullable=False)

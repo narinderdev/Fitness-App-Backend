@@ -56,6 +56,7 @@ class VideoCreateRequest(BaseModel):
     video_url: AnyHttpUrl
     thumbnail_url: AnyHttpUrl
     duration_seconds: int | None = Field(None, gt=0)
+    requires_payment: bool = False
 
     @field_validator("body_part")
     @classmethod
@@ -87,6 +88,7 @@ class VideoUpdateRequest(BaseModel):
     video_url: AnyHttpUrl | None = None
     thumbnail_url: AnyHttpUrl | None = None
     duration_seconds: int | None = Field(None, gt=0)
+    requires_payment: bool | None = None
 
     @field_validator("body_part")
     @classmethod
@@ -119,6 +121,7 @@ class VideoResponse(BaseModel):
     video_url: str
     thumbnail_url: str
     duration_seconds: int | None = None
+    requires_payment: bool = False
     created_at: datetime
 
     model_config = {"from_attributes": True}

@@ -91,6 +91,7 @@ def ensure_user_flag_columns(engine: Engine) -> None:
         "has_pilates_board",
         "has_ankle_wrist_weights",
         "purchased_plan",
+        "has_library_access",
     ]
 
     missing_columns = [column for column in flag_columns if column not in columns]
@@ -459,6 +460,36 @@ def ensure_video_duration_column(engine: Engine) -> None:
                     """
                     ALTER TABLE videos
                     ADD COLUMN duration_seconds INTEGER
+                    """
+                )
+            )
+
+
+def ensure_video_payment_column(engine: Engine) -> None:
+    inspector = inspect(engine)
+    if "videos" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("videos")}
+    if "requires_payment" in columns:
+        return
+
+    with engine.begin() as connection:
+        if engine.dialect.name == "postgresql":
+            connection.execute(
+                text(
+                    """
+                    ALTER TABLE videos
+                    ADD COLUMN IF NOT EXISTS requires_payment BOOLEAN DEFAULT FALSE
+                    """
+                )
+            )
+        else:
+            connection.execute(
+                text(
+                    """
+                    ALTER TABLE videos
+                    ADD COLUMN requires_payment BOOLEAN DEFAULT 0
                     """
                 )
             )

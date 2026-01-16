@@ -227,6 +227,7 @@ def upload_video(
             video_url=str(payload.video_url),
             thumbnail_url=str(payload.thumbnail_url),
             duration_seconds=payload.duration_seconds,
+            requires_payment=payload.requires_payment,
         )
         db.add(new_video)
         db.commit()
@@ -268,6 +269,8 @@ def update_video(
             video.thumbnail_url = str(payload.thumbnail_url)
         if payload.duration_seconds is not None:
             video.duration_seconds = payload.duration_seconds
+        if payload.requires_payment is not None:
+            video.requires_payment = payload.requires_payment
 
         db.commit()
         db.refresh(video)

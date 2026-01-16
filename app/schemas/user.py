@@ -60,6 +60,7 @@ class ProfileResponse(BaseModel):
     has_pilates_board: bool
     has_ankle_wrist_weights: bool
     purchased_plan: bool
+    has_library_access: bool = False
     referral_code: str | None = None
 
     model_config = {"from_attributes": True}
@@ -69,3 +70,4 @@ class UserFlagsUpdate(BaseModel):
     has_pilates_board: bool | None = None
     has_ankle_wrist_weights: bool | None = None
     purchased_plan: bool | None = None
+    has_library_access: bool | None = None

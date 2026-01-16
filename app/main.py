@@ -42,6 +42,7 @@ from app.utils.db_migrations import (
     ensure_legal_links_subscription_column,
     migrate_app_settings_to_legal_links,
     ensure_video_duration_column,
+    ensure_video_payment_column,
     drop_products_key_column,
     ensure_product_link_column,
 )
@@ -81,6 +82,7 @@ async def startup_event():
     migrate_app_settings_to_legal_links(engine)
     ensure_legal_links_subscription_column(engine)
     ensure_video_duration_column(engine)
+    ensure_video_payment_column(engine)
     drop_products_key_column(engine)
     ensure_product_link_column(engine)
     run_seed()
